@@ -523,9 +523,6 @@
 .message.sent .cypher-overlay {
   background: rgba(0, 0, 0, 0.15);
   color: #d0d0d0;
-  padding: 0 0.75rem; /* Add padding to prevent content shift */
-  min-width: 100%; /* Ensure consistent width */
-  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* Encryption status */
@@ -586,18 +583,25 @@
 }
 
 @keyframes textGlitch {
-  0%, 100% {
-    text-shadow: 0 0 2px rgba(160, 160, 160, 0.3);
+  0% {
+    text-shadow: 1px 1px 1px rgba(160, 160, 160, 0.3);
     transform: translateX(0);
   }
   25% {
-    text-shadow: 1px 1px 2px rgba(160, 160, 160, 0.3);
+    text-shadow: -1px -1px 1px rgba(160, 160, 160, 0.3);
+    transform: translateX(1px);
   }
   50% {
-    text-shadow: -1px -1px 2px rgba(160, 160, 160, 0.3);
+    text-shadow: 1px -1px 1px rgba(160, 160, 160, 0.3);
+    transform: translateX(-1px);
   }
   75% {
-    text-shadow: 1px -1px 2px rgba(160, 160, 160, 0.3);
+    text-shadow: -1px 1px 1px rgba(160, 160, 160, 0.3);
+    transform: translateX(0);
+  }
+  100% {
+    text-shadow: 1px 1px 1px rgba(160, 160, 160, 0.3);
+    transform: translateX(0);
   }
 }
 

@@ -98,6 +98,8 @@ const Auth = () => {
   };
 
   const handleSignup = async (e) => {
+    console.log("Signup handler called"); 
+    console.log(`${apiUrl}/auth/register`)
     e.preventDefault();
     setError("");
     
@@ -261,7 +263,6 @@ const Auth = () => {
                       placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      style={{width:"92%"}}
                       required
                     />
                   </div>
@@ -324,7 +325,7 @@ const Auth = () => {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                style={{width:"92%"}}
+                style={{width:"100%"}}
                 required
               />
             </div>

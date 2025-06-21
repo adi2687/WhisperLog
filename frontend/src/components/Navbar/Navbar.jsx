@@ -11,27 +11,8 @@ const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login status
   const location = useLocation();
   const apiUrl = import.meta.env.VITE_BACKEND_URL
-  // console.log(apiUrl)
-  useEffect(() => {
-    fetch(`${apiUrl}/user/profile`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    })
-    // console.log(`${apiUrl}/user/profile`)
-      .then((response) => response.json())
-      .then((data) => {
-        setCheck(data);
-        if (data?.message === "Success") {
-          setIsLoggedIn(true);
-          console.log("User logged in");
-        } else {
-          setIsLoggedIn(false);
-          console.log("User is not logged in");
-        }
-      })
-      .catch((error) => console.error("Error fetching profile:", error));
-  }, []);
+  console.log(apiUrl)
+  
 
   // Only show navbar on the landing page
   if (location.pathname !== '/') {
