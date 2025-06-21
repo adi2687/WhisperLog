@@ -1,0 +1,196 @@
+/* Base Styles */
+.cta {
+  position: relative;
+  padding: 6rem 2rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  overflow: hidden;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.1) 0%, transparent 40%);
+  z-index: 1;
+}
+
+.cta-content {
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+  z-index: 2;
+}
+
+.cta h2 {
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #f8fafc, #a5b4fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s ease forwards 0.2s;
+}
+
+.cta p {
+  font-size: 1.25rem;
+  color: #a1a1aa;
+  max-width: 600px;
+  margin: 0 auto 3rem;
+  line-height: 1.7;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s ease forwards 0.3s;
+}
+
+.cta-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s ease forwards 0.4s;
+}
+
+.cta-buttons a {
+  text-decoration: none;
+}
+
+.cta-buttons button {
+  position: relative;
+  padding: 1rem 2.5rem;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: none;
+  overflow: hidden;
+  z-index: 1;
+  box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.2);
+  margin:0px 0px
+}
+
+.cta-buttons button:first-child {
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+}
+
+.cta-buttons button:last-child {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cta-buttons button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.cta-buttons button:first-child::before {
+  background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.cta-buttons button:last-child::before {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cta-buttons button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px -5px rgba(99, 102, 241, 0.4);
+}
+
+.cta-buttons button:first-child:hover {
+  box-shadow: 0 10px 30px -5px rgba(99, 102, 241, 0.5);
+}
+
+.cta-buttons button:last-child:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.2);
+}
+
+.cta-buttons button:hover::before {
+  opacity: 1;
+}
+
+.cta-buttons button:active {
+  transform: translateY(-1px);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .cta {
+    padding: 5rem 1.5rem;
+  }
+  
+  .cta h2 {
+    font-size: 2.25rem;
+    margin-bottom: 1.25rem;
+  }
+  
+  .cta p {
+    font-size: 1.1rem;
+    margin-bottom: 2.5rem;
+  }
+  
+  .cta-buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .cta-buttons button {
+    width: 100%;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .cta h2 {
+    font-size: 2rem;
+  }
+  
+  .cta p {
+    font-size: 1rem;
+  }
+}
+
