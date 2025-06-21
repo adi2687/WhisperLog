@@ -1,4 +1,4 @@
-import FuzzyText from './FuzzyText';
+import FuzzyText from './fuzzytext';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 

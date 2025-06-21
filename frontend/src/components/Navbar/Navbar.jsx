@@ -11,7 +11,6 @@ const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login status
   const location = useLocation();
   const apiUrl = import.meta.env.VITE_BACKEND_URL
-  console.log(apiUrl)
   
 
   // Only show navbar on the landing page

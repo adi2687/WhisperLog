@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser'
 dotenv.config()
 
 import connect from '../db/connection.js'
+import userRegister from '../route/user.register.js'
 import userLogin from '../route/user.login.js'
 import userRoutes from '../route/users.route.js'
 const PORT = process.env.PORT || 5000
@@ -29,8 +30,8 @@ app.get('/', (req, res) => {
 })
 
 // Auth routes
-app.use('/auth/register', userLogin)
-
+app.use('/auth/register', userRegister)
+app.use('/auth/login', userLogin)
 // Comments API routes
 app.use('/api/users', userRoutes)
 // Socket.io setup

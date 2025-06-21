@@ -45,49 +45,54 @@ const Auth = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-
+  
     if (!email || !password) {
       setError("Please enter both email and password.");
       return;
     }
-    
-    // Check if intro has been completed before
-    const introComplete = localStorage.getItem('introComplete');
-
+  
     setLogging(true);
-
+  
     try {
       const response = await fetch(`${apiUrl}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         credentials: "include",
         body: JSON.stringify({ email, password }),
       });
-
+  
       const data = await response.json();
-
+      
       if (!response.ok) {
-        setError(data.msg || "Invalid email or password.");
+        setError(data.message || "Invalid email or password.");
+        return;
+      }
+  
+      // Store token if provided
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+  
+      // Store user data in localStorage if available
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+  
+      // Check if intro has been completed before
+      const introComplete = localStorage.getItem('introComplete');
+      
+      if (introComplete !== 'true' || introComplete === null) {
+        console.log("Intro not completed");
+        // For first-time or returning users who haven't seen the intro
+        localStorage.removeItem('introComplete');
+        navigate("/intro"); // Navigate to intro first
       } else {
-        console.log("Login successful:", data);
-        
-        // Store token if provided
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-        }
-        
-        // Check if intro has been completed before
-        const introComplete = localStorage.getItem('introComplete');
-        
-        if (introComplete !== 'true') {
-          // For first-time or returning users who haven't seen the intro
-          // Set flag to false to ensure intro is shown
-          localStorage.removeItem('introComplete');
-          window.location.href = "/";
-        } else {
-          // For users who have already seen the intro
-          window.location.href = "/profile";
-        }
+        console.log("Intro completed");
+        // For users who have already seen the intro
+        navigate("/profile");
       }
     } catch (err) {
       console.error("Error during login:", err);
