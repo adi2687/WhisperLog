@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import './Homelast.css';
+import './HomeLast.css';
 function HomeLast(){
     return(
     <section className="cta">
