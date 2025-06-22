@@ -39,7 +39,6 @@ function App() {
               } />
               <Route path="*" element={<Notfound />} />
               <Route path="/list" element={<AnimatedList />} />
-              <Route path="/liquidglass" element={<GlassEffect />} />
               <Route path="/profilecard" element={<Card />} />
             </Routes>
           </main>
