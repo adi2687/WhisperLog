@@ -10,27 +10,37 @@ import Auth from './components/Auth/Auth';
 import Footer from './components/Footer/Footer';
 import Notfound from './components/Notfound/notfound';
 import ProfileOthersPage from './components/profile/ProfilePage';
-
+import ProfilePage from './components/profile/UserProfileSection';
+import { CurrentUserProfileProvider } from './contexts/ProfileContext';
+import AnimatedList from './components/List/list';
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   return (
     <Router>
-      <div className="app">
-        <Navbar isLoggedIn={isLoggedIn} />
-        <main>
-          <Routes>
-            <Route path="/" element={<Homepage />} />
-            <Route path="/chat" element={<Main />} />
-            <Route path="/showcasing" element={<Showcasing />} />
-            <Route path="/intro" element={<Intro />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/profile/:username" element={<ProfileOthersPage />} />
-            <Route path="*" element={<Notfound />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+      <ProfileProvider>
+        <div className="app">
+          <Navbar isLoggedIn={isLoggedIn} />
+          <main>
+            <Routes>
+              <Route path="/" element={<Homepage />} />
+              <Route path="/chat" element={<Main />} />
+              <Route path="/showcasing" element={<Showcasing />} />
+              <Route path="/intro" element={<Intro />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/profile/:username" element={<ProfileOthersPage />} />
+              <Route path="/profile" element={
+              <CurrentUserProfileProvider>
+                <ProfilePage />
+                </CurrentUserProfileProvider>
+                } />
+              <Route path="*" element={<Notfound />} />
+              <Route path="/list" element={<AnimatedList />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </ProfileProvider>
     </Router>
   );
 }

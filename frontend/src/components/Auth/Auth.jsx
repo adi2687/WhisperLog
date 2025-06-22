@@ -143,7 +143,9 @@ const Auth = () => {
         if (data.token) {
           localStorage.setItem('token', data.token);
         }
-        
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
         // User profile setup flag removed
         
         // Show intro for new users

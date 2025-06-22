@@ -29,7 +29,7 @@ router.post("", async (req, res) => {
             sameSite: "strict",
             maxAge: 24 * 60 * 60 * 1000
         })
-        res.status(201).json({ message: "User registered successfully", user:newUser })
+        res.status(201).json({ message: "User registered successfully", user:newUser,token:token })
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: "Internal server error" })

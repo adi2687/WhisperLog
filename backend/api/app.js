@@ -8,6 +8,7 @@ import connect from '../db/connection.js'
 import userRegister from '../route/user.register.js'
 import userLogin from '../route/user.login.js'
 import userRoutes from '../route/users.route.js'
+import ProfileRoues from '../route/profile.routes.js'
 const PORT = process.env.PORT || 5000
 const app = express()
 
@@ -24,6 +25,7 @@ app.use(cors(corsOptions))
 app.use(express.json()) // important for parsing JSON body
 app.use(cookieParser()) // for parsing cookies
 
+
 // Routes
 app.get('/', (req, res) => {
     res.send('Main page')
@@ -34,6 +36,7 @@ app.use('/auth/register', userRegister)
 app.use('/auth/login', userLogin)
 // Comments API routes
 app.use('/api/users', userRoutes)
+app.use('/api/profile',ProfileRoues)
 // Socket.io setup
 import { Server } from 'socket.io'
 import http from 'http'

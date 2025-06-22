@@ -4,19 +4,23 @@ import { Menu, X } from "lucide-react";
 import Logo from "/logo_main.png";
 import "./Navbar.css";
 import "./NavDropdown.css";
- 
+import Input from "./input"; 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [check, setCheck] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login status
   const location = useLocation();
   const apiUrl = import.meta.env.VITE_BACKEND_URL
-  
-
-  // Only show navbar on the landing page
-  if (location.pathname !== '/') {
-    return null;
+  const checkmain=localStorage.getItem("token")
+useEffect(()=>{
+  if(checkmain){
+    setIsLoggedIn(true)
   }
+},[checkmain])
+  // Only show navbar on the landing page
+  // if (location.pathname !== '/') {
+  //   return null;
+  // }
   
   return (
     <nav className="navbar">
@@ -25,10 +29,13 @@ const Navbar = () => {
           <Link to="/">
             <img src={Logo} alt="Outfit AI" className="logo-image" />
           </Link>
+          <Input/>
         </div>
-
+        
         <div className={`navbar-menu ${isOpen ? "active" : ""}`}>
           <Link to="/Home" className="nav-link" onClick={()=>setIsOpen(false)}>Home</Link>
+          <Link to="/chat" className="nav-link" onClick={()=>setIsOpen(false)}>Chat</Link>
+          
           <Link to='/Developers' className="nav-link" onClick={()=>setIsOpen(false)}>Developers</Link>
         </div>
  

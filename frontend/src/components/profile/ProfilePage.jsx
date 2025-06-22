@@ -15,7 +15,13 @@ const ProfileContent = () => {
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [friendError, setFriendError] = useState('');
-
+  const [activeTab, setActiveTab] = useState('about');
+  
+  // Check if this is the current user's profile
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const isCurrentUser = currentUser && currentUser._id === profile?._id;
+// console.log('currentUser',currentUser)
+// console.log()
   // Fetch friends list
   useEffect(() => {
     if (profile?.friends) {
@@ -69,7 +75,23 @@ const ProfileContent = () => {
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
   if (profileError) return <div className="error-message">{profileError}</div>;
   if (!profile) return <div className="not-found">Profile not found</div>;
-
+  
+  // Personal details to display
+  const personalDetails = [
+    { label: 'Full Name', value: profile.username },
+    { label: 'Email', value: isCurrentUser ? profile.email : 'Private' },
+    { label: 'Location', value: profile.location || 'Not specified' },
+    { label: 'Birthday', value: profile.birthday.slice(0, 10) || 'Not specified' },
+    { label: 'Gender', value: profile.gender || 'Not specified' },
+    {label:'Hobbies',value:profile.hobbies.join(', ')||'Not specified'},
+    {label:'Interests',value:profile.moviePreferences.join(', ')||'Not specified'},
+    {label:'Music',value:profile.musicPreferences.join(', ')||'Not specified'}
+    
+  ];
+  
+  // Hobbies and interests
+  const hobbies = profile.hobbies || [];
+  const interests = profile.interests || [];
   return (
     <div className="profile-container">
       <div className="profile-card">
@@ -94,7 +116,7 @@ const ProfileContent = () => {
           </div>
           <h1 className="username">{profile.username}</h1>
           
-          {!isFriend && (
+          {!isFriend&&!isCurrentUser&& (
             <div className="profile-actions">
               <button 
                 className={`action-button ${isRequestSent ? 'requested' : ''}`}
@@ -117,37 +139,217 @@ const ProfileContent = () => {
             <span className="stat-value">{friends.length}</span>
             <span className="stat-label">Friends</span>
           </div>
-          <div className="stat">
-            <span className="stat-value">{profile.posts?.length || 0}</span>
-            <span className="stat-label">Posts</span>
-          </div>
         </div>
 
-        <div className="friends-section">
-          <div className="section-header">
-            <h2>Friends</h2>
-            {friends.length > 0 && (
-              <button className="see-all" onClick={() => navigate(`/friends/${profile.username}`)}>
-                See All
-              </button>
-            )}
-          </div>
-          
-          {friends.length > 0 ? (
-            <div className="friends-grid">
-              {friends.slice(0, 6).map((friend) => (
-                <div 
-                  key={friend.id} 
-                  className="friend-card"
-                  onClick={() => navigate(`/profile/${friend.username}`)}
-                >
-                  <img src={friend.avatar} alt={friend.name} className="friend-avatar" />
-                  <span className="friend-name">{friend.name}</span>
-                </div>
-              ))}
+        {/* Tab Content */}
+        <div className="tab-content">
+          {activeTab === 'about' && (
+            <div className="about-section">
+              <h3>About {profile.username}</h3>
+              <div className="personal-details">
+                {personalDetails.map((detail, index) => (
+                  <div key={index} className="detail-item">
+                    <span className="detail-label">{detail.label}:</span>
+                    <span className="detail-value">{detail.value}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="bio-section">
+                <h4>Bio</h4>
+                <p>{profile.bio || 'No bio available'}</p>
+              </div>
             </div>
-          ) : (
-            <p className="no-friends">No friends yet</p>
+          )}
+          
+          {activeTab === 'friends' && (
+            <div className="friends-section">
+              <div className="section-header">
+                <h3>Friends</h3>
+                {friends.length > 0 && (
+                  <button className="see-all" onClick={() => navigate(`/friends/${profile.username}`)}>
+                    See All
+                  </button>
+                )}
+              </div>
+              
+              {friends.length > 0 ? (
+                <div className="friends-grid">
+                  {friends.slice(0, 6).map((friend) => (
+                    <div 
+                      key={friend.id} 
+                      className="friend-card"
+                      onClick={() => navigate(`/profile/${friend.username}`)}
+                    >
+                      <img src={friend.avatar} alt={friend.name} className="friend-avatar" />
+                      <span className="friend-name">{friend.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-friends">No friends yet</p>
+              )}
+            </div>
+          )}
+          
+          {activeTab === 'hobbies' && (
+            <div className="hobbies-interests-music-section">
+              <div className="section-card">
+                <h3>🎯 Hobbies</h3>
+                {hobbies.length > 0 ? (
+                  <div className="tags-container">
+                    {hobbies.map((hobby, index) => (
+                      <span key={`hobby-${index}`} className="tag">
+                        {hobby}
+                        {isCurrentUser && (
+                          <button className="remove-tag" onClick={(e) => {
+                            e.stopPropagation();
+                            // Handle remove hobby
+                          }}>×</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-state">No hobbies added yet</p>
+                )}
+                {isCurrentUser && (
+                  <button className="add-button" onClick={() => {
+                    // Handle add new hobby
+                    const newHobby = prompt('Add a new hobby:');
+                    if (newHobby) {
+                      // Update profile with new hobby
+                    }
+                  }}>
+                    + Add Hobby
+                  </button>
+                )}
+              </div>
+              
+              <div className="section-card">
+                <h3>🌟 Interests</h3>
+                {interests.length > 0 ? (
+                  <div className="tags-container">
+                    {interests.map((interest, index) => (
+                      <span key={`interest-${index}`} className="tag">
+                        {interest}
+                        {isCurrentUser && (
+                          <button className="remove-tag" onClick={(e) => {
+                            e.stopPropagation();
+                            // Handle remove interest
+                          }}>×</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-state">No interests added yet</p>
+                )}
+                {isCurrentUser && (
+                  <button className="add-button" onClick={() => {
+                    const newInterest = prompt('Add a new interest:');
+                    if (newInterest) {
+                      // Update profile with new interest
+                    }
+                  }}>
+                    + Add Interest
+                  </button>
+                )}
+              </div>
+
+              <div className="section-card">
+                <h3>🎵 Music & Artists</h3>
+                
+                <div className="music-section">
+                  <h4>Favorite Artists</h4>
+                  {favArtists.length > 0 ? (
+                    <div className="tags-container">
+                      {favArtists.map((artist, index) => (
+                        <span key={`artist-${index}`} className="tag">
+                          {artist}
+                          {isCurrentUser && (
+                            <button className="remove-tag" onClick={(e) => {
+                              e.stopPropagation();
+                              // Handle remove artist
+                            }}>×</button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="empty-state">No favorite artists added</p>
+                  )}
+                  {isCurrentUser && (
+                    <button className="add-button" onClick={() => {
+                      const newArtist = prompt('Add a favorite artist:');
+                      if (newArtist) {
+                        // Update profile with new artist
+                      }
+                    }}>
+                      + Add Artist
+                    </button>
+                  )}
+                </div>
+
+                <div className="music-section">
+                  <h4>Favorite Genres</h4>
+                  {favGenres.length > 0 ? (
+                    <div className="tags-container">
+                      {favGenres.map((genre, index) => (
+                        <span key={`genre-${index}`} className="tag">
+                          {genre}
+                          {isCurrentUser && (
+                            <button className="remove-tag" onClick={(e) => {
+                              e.stopPropagation();
+                              // Handle remove genre
+                            }}>×</button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="empty-state">No favorite genres added</p>
+                  )}
+                  {isCurrentUser && (
+                    <button className="add-button" onClick={() => {
+                      const newGenre = prompt('Add a favorite genre:');
+                      if (newGenre) {
+                        // Update profile with new genre
+                      }
+                    }}>
+                      + Add Genre
+                    </button>
+                  )}
+                </div>
+
+                <div className="music-section">
+                  <h4>Currently Listening</h4>
+                  {music.length > 0 ? (
+                    <div className="music-list">
+                      {music.map((track, index) => (
+                        <div key={`track-${index}`} className="music-item">
+                          <span className="track-name">{track.name}</span>
+                          <span className="track-artist">{track.artist}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="empty-state">Not currently listening to anything</p>
+                  )}
+                  {isCurrentUser && (
+                    <button className="add-button" onClick={() => {
+                      const trackName = prompt('What are you listening to?');
+                      const artistName = prompt('Who is the artist?');
+                      if (trackName && artistName) {
+                        // Update currently listening
+                      }
+                    }}>
+                      + Add Current Track
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

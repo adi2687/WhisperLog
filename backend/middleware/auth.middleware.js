@@ -3,10 +3,14 @@ import User from '../models/user.model.js';
 
 export const verifyToken = async (req, res, next) => {
   try {
+    console.log('Auth Headers:', req.headers);
     // Get token from cookies or Authorization header
+    const authHeader = req.header('Authorization');
     const token = req.cookies?.token || 
-                 req.header('Authorization')?.replace('Bearer ', '');
+                 (authHeader && authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null);
 
+    console.log('Extracted token:', token ? 'Token exists' : 'No token found');
+    
     if (!token) {
       return res.status(401).json({
         success: false,
