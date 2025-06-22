@@ -13,7 +13,7 @@ import ProfileOthersPage from './components/profile/ProfilePage';
 import ProfilePage from './components/profile/UserProfileSection';
 import { CurrentUserProfileProvider } from './contexts/ProfileContext';
 import AnimatedList from './components/List/list';
-import GlassEffect from './components/GlassEffect/glassEffect';
+// import GlassEffect from './components/GlassEffect/glassEffect';
 import Card from './components/profile/profilecard/card';
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
