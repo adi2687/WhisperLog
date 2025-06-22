@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProfileProvider } from './contexts/ProfileContext';
 import Navbar from "./components/Navbar/Navbar";
 import Homepage from './components/Homepage/Homepage';
@@ -13,6 +13,8 @@ import ProfileOthersPage from './components/profile/ProfilePage';
 import ProfilePage from './components/profile/UserProfileSection';
 import { CurrentUserProfileProvider } from './contexts/ProfileContext';
 import AnimatedList from './components/List/list';
+import GlassEffect from './components/GlassEffect/glassEffect';
+import Card from './components/profile/profilecard/card';
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -20,6 +22,7 @@ function App() {
     <Router>
       <ProfileProvider>
         <div className="app">
+          
           <Navbar isLoggedIn={isLoggedIn} />
           <main>
             <Routes>
@@ -30,12 +33,14 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/profile/:username" element={<ProfileOthersPage />} />
               <Route path="/profile" element={
-              <CurrentUserProfileProvider>
-                <ProfilePage />
+                <CurrentUserProfileProvider>
+                  <ProfilePage />
                 </CurrentUserProfileProvider>
-                } />
+              } />
               <Route path="*" element={<Notfound />} />
               <Route path="/list" element={<AnimatedList />} />
+              <Route path="/liquidglass" element={<GlassEffect />} />
+              <Route path="/profilecard" element={<Card />} />
             </Routes>
           </main>
           <Footer />
