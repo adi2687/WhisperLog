@@ -1,21 +1,20 @@
 // ProfilePage.js
 import { useParams, useNavigate } from 'react-router-dom';
-import { ProfileProvider, useProfile, useAuth } from '../../contexts/ProfileContext';
+import { ProfileProvider } from '../../contexts/ProfileContext';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import './ProfilePage.css';
-
+import './profile.css';
+import { useProfile } from '../../contexts/ProfileContext';
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const ProfileContent = () => {
-  const { profile, loading, error } = useProfile();
-  const { user: currentUser } = useAuth();
-  const fileInputRef = useRef(null);
+  const { profile, loading, error: profileError } = useProfile();
   const navigate = useNavigate();
-  const [isUploading, setIsUploading] = useState(false);
   const [isFriend, setIsFriend] = useState(false);
+  const [isRequestSent, setIsRequestSent] = useState(false);
   const [friends, setFriends] = useState([]);
-  const isCurrentUser = currentUser?.username === profile?.username;
+  const [isLoading, setIsLoading] = useState(false);
+  const [friendError, setFriendError] = useState('');
 
   // Fetch friends list
   useEffect(() => {
@@ -25,113 +24,90 @@ const ProfileContent = () => {
     }
   }, [profile]);
 
-  const handleImageUpload = async (e) => {
-    if (!isCurrentUser) return;
-    
-    const file = e.target.files[0];
-    if (!file) return;
 
-    const formData = new FormData();
-    formData.append('profilePicture', file);
-
-    try {
-      setIsUploading(true);
-      const response = await axios.post(
-        `${backendUrl}/api/users/upload-profile-picture`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,
-        }
-      );
-      
-      if (response.data.profilePicture) {
-        // Refresh profile data
-        window.location.reload();
-      }
-    } catch (err) {
-      console.error('Error uploading profile picture:', err);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleAddFriend = async () => {
-    try {
-      // In a real app, you would call your API to send a friend request
-      // await axios.post(`${backendUrl}/api/friends/request`, { userId: profile._id });
-      setIsFriend(true);
-    } catch (err) {
-      console.error('Error sending friend request:', err);
-    }
-  };
 
   const handleMessage = () => {
     // Navigate to chat with this user
     navigate(`/chat?user=${profile.username}`);
   };
 
+  const handleAddFriend = async () => {
+    if (!profile?._id) return;
+    
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/auth');
+        return;
+      }
+      
+      const response = await axios.post(
+        `${backendUrl}/api/friends/request`,
+        { userId: profile._id },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setIsRequestSent(true);
+      }
+    } catch (err) {
+      setFriendError(err.response?.data?.message || 'Failed to send friend request');
+      console.error('Error sending friend request:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
-  if (error) return <div className="error-message">{error}</div>;
+  if (profileError) return <div className="error-message">{profileError}</div>;
   if (!profile) return <div className="not-found">Profile not found</div>;
 
   return (
     <div className="profile-container">
       <div className="profile-card">
         <div className="profile-header">
-          <div 
-            className={`profile-picture-container ${isCurrentUser ? 'editable' : ''}`} 
-            onClick={() => isCurrentUser && fileInputRef.current?.click()}
-          >
+          <div className="profile-picture-container">
             <div className="profile-picture">
-              <img 
-                src={profile.profilePicture || '/default-avatar.png'} 
-                alt={profile.username} 
-              />
-              {isCurrentUser && (
-                <div className="profile-picture-overlay">
-                  <span>Change Photo</span>
-                </div>
-              )}
+              {profile.profilePicture ? (
+                <img 
+                  src={profile.profilePicture} 
+                  alt={profile.username}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div className="default-avatar">
+                {profile.username?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
             </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageUpload}
-              accept="image/*"
-              style={{ display: 'none' }}
-              disabled={isUploading || !isCurrentUser}
-            />
           </div>
           <h1 className="username">{profile.username}</h1>
           
-          {!isCurrentUser ? (
+          {!isFriend && (
             <div className="profile-actions">
               <button 
-                className={`action-button ${isFriend ? 'friend' : 'add-friend'}`}
+                className={`action-button ${isRequestSent ? 'requested' : ''}`}
                 onClick={handleAddFriend}
-                disabled={isFriend}
+                disabled={isLoading || isRequestSent}
               >
-                <i className={`fas ${isFriend ? 'fa-check' : 'fa-user-plus'}`}></i>
-                {isFriend ? 'Friends' : 'Add Friend'}
+                {isLoading ? 'Sending...' : isRequestSent ? 'Request Sent' : 'Add Friend'}
               </button>
-              <button 
-                className="action-button message"
-                onClick={handleMessage}
-              >
-                <i className="fas fa-envelope"></i> Message
-              </button>
+              {friendError && <div className="error-message">{friendError}</div>}
             </div>
-          ) : (
-            <button 
-              className="action-button edit-profile"
-              onClick={() => navigate('/settings/profile')}
-            >
-              <i className="fas fa-edit"></i> Edit Profile
-            </button>
           )}
+          
+          
         </div>
 
         {profile.bio && <p className="profile-bio">{profile.bio}</p>}

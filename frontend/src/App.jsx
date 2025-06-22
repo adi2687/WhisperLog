@@ -9,7 +9,7 @@ import Intro from './components/Intro/Intro';
 import Auth from './components/Auth/Auth';
 import Footer from './components/Footer/Footer';
 import Notfound from './components/Notfound/notfound';
-import ProfilePage from './components/profile/ProfilePage';
+import ProfileOthersPage from './components/profile/ProfilePage';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -25,7 +25,7 @@ function App() {
             <Route path="/showcasing" element={<Showcasing />} />
             <Route path="/intro" element={<Intro />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/profile/:username" element={<ProfilePage />} />
+            <Route path="/profile/:username" element={<ProfileOthersPage />} />
             <Route path="*" element={<Notfound />} />
           </Routes>
         </main>
