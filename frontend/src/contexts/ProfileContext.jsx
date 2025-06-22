@@ -26,7 +26,7 @@ export const ProfileProvider = ({ children, username }) => {
 
   const fetchProfile = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/api/users/${username}`, {
+      const response = await axios.get(`${backendUrl}/visitfriend/${username}`, {
         withCredentials: true,
       });
       setProfile(response.data.user);

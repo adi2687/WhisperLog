@@ -4,7 +4,9 @@ import { Menu, X } from "lucide-react";
 import Logo from "/logo_main.png";
 import "./Navbar.css";
 import "./NavDropdown.css";
-import Input from "./input"; 
+import Input from "./input";
+import NotificationBell from "../Notifications/NotificationBell";
+
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [check, setCheck] = useState(null);
@@ -21,7 +23,9 @@ useEffect(()=>{
   // if (location.pathname !== '/') {
   //   return null;
   // }
-  
+  if (location.pathname === '/chat') {
+    return null;
+  }
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -29,19 +33,24 @@ useEffect(()=>{
           <Link to="/">
             <img src={Logo} alt="Outfit AI" className="logo-image" />
           </Link>
-          <Input/>
+          <div className="search-container">
+            <Input />
+          </div>
         </div>
-        
+
         <div className={`navbar-menu ${isOpen ? "active" : ""}`}>
           <Link to="/Home" className="nav-link" onClick={()=>setIsOpen(false)}>Home</Link>
           <Link to="/chat" className="nav-link" onClick={()=>setIsOpen(false)}>Chat</Link>
-          
+          <Link to="/addFriend" className="nav-link" onClick={()=>setIsOpen(false)}>Add Friend</Link>
           <Link to='/Developers' className="nav-link" onClick={()=>setIsOpen(false)}>Developers</Link>
         </div>
  
         <div className="navbar-icons">
           {isLoggedIn ? (
-            <Link to="/profile" className="icon">Profile</Link>
+            <>
+              <NotificationBell />
+              <Link to="/profile" className="icon">Profile</Link>
+            </>
           ) : (
             <Link to="/auth" className="icon">Login / SignUp</Link>
           )}
@@ -54,9 +63,8 @@ useEffect(()=>{
       {/* Mobile Menu */}
       <div className={`navbar-mobile-menu ${isOpen ? "open" : ""}`}>
         <Link to="/Home" className="mobile-link" onClick={()=>setIsOpen(false)}>Home</Link>
-        <Link to='/Developers' className="mobile-link" onClick={()=>setIsOpen(false)}>Developers</Link>
-        
-        
+        <Link to="/Chat" className="mobile-link" onClick={()=>setIsOpen(false)}>Chat</Link>
+        {/* <Link to='/Developers' className="mobile-link" onClick={()=>setIsOpen(false)}>Developers</Link> */}
       </div>
     </nav>
   );

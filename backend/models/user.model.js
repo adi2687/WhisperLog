@@ -23,16 +23,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
-    followers: {
-        type: Array,
-        default: []
-    },
-    following: {
-        type: Array,
-        default: []
-    },
-    friendRequestsSent: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    friendRequestsReceived: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     bio: {
         type: String,
         default: ""

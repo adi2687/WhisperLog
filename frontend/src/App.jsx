@@ -1,6 +1,9 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ProfileProvider } from './contexts/ProfileContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
+import Loader from './components/Loader/Loader';
 import Navbar from "./components/Navbar/Navbar";
 import Homepage from './components/Homepage/Homepage';
 import Main from "./components/message/main";
@@ -13,38 +16,60 @@ import ProfileOthersPage from './components/profile/ProfilePage';
 import ProfilePage from './components/profile/UserProfileSection';
 import { CurrentUserProfileProvider } from './contexts/ProfileContext';
 import AnimatedList from './components/List/list';
-// import GlassEffect from './components/GlassEffect/glassEffect';
 import Card from './components/profile/profilecard/card';
+import AddFriend from './components/AddFriend/AddFriend';
+// imp
+// Protected route component
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <Loader />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  return children;
+};
+
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   return (
     <Router>
-      <ProfileProvider>
-        <div className="app">
-          
-          <Navbar isLoggedIn={isLoggedIn} />
-          <main>
-            <Routes>
-              <Route path="/" element={<Homepage />} />
-              <Route path="/chat" element={<Main />} />
-              <Route path="/showcasing" element={<Showcasing />} />
-              <Route path="/intro" element={<Intro />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/profile/:username" element={<ProfileOthersPage />} />
-              <Route path="/profile" element={
-                <CurrentUserProfileProvider>
-                  <ProfilePage />
-                </CurrentUserProfileProvider>
-              } />
-              <Route path="*" element={<Notfound />} />
-              <Route path="/list" element={<AnimatedList />} />
-              <Route path="/profilecard" element={<Card />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
-      </ProfileProvider>
+      <AuthProvider>
+        <WebSocketProvider>
+          <ProfileProvider>
+            <div className="app">
+              <Navbar />
+              <main>
+                <Routes>
+                  <Route path="/" element={<Homepage />} />
+                  <Route path="/chat" element={<Main />} />
+                  <Route path="/showcasing" element={<Showcasing />} />
+                  <Route path="/intro" element={<Intro />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/profile/:username" element={<ProfileOthersPage />} />
+                  <Route 
+                    path="/profile" 
+                    element={
+                      <CurrentUserProfileProvider>
+                        <ProfilePage />
+                      </CurrentUserProfileProvider>
+                    } 
+                  />
+                  <Route path="*" element={<Notfound />} />
+                  <Route path="/list" element={<AnimatedList />} />
+                  <Route path="/profilecard" element={<Card />} />
+                  <Route path="/addFriend" element={<AddFriend />} />
+                </Routes>
+              </main>
+              <Footer />
+            </div>
+          </ProfileProvider>
+        </WebSocketProvider>
+      </AuthProvider>
     </Router>
   );
 }

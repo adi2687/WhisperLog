@@ -16,7 +16,7 @@ const ProfileContent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [friendError, setFriendError] = useState('');
   const [activeTab, setActiveTab] = useState('about');
-  
+  const [error,setError] = useState('');
   // Check if this is the current user's profile
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const isCurrentUser = currentUser && currentUser._id === profile?._id;
@@ -81,7 +81,7 @@ const ProfileContent = () => {
     { label: 'Full Name', value: profile.username },
     { label: 'Email', value: isCurrentUser ? profile.email : 'Private' },
     { label: 'Location', value: profile.location || 'Not specified' },
-    { label: 'Birthday', value: profile.birthday.slice(0, 10) || 'Not specified' },
+    { label: 'Birthday', value: profile.birthday ? profile.birthday.slice(0, 10) : 'Not specified' },
     { label: 'Gender', value: profile.gender || 'Not specified' },
     {label:'Hobbies',value:profile.hobbies.join(', ')||'Not specified'},
     {label:'Interests',value:profile.moviePreferences.join(', ')||'Not specified'},
