@@ -26,14 +26,17 @@ router.post("/",verifyToken,async (req,res)=>{
                 message: 'No users found' 
             });
         }
+        // Add isFriend flag to each user
+        const usersWithFriendStatus = users.map(user => ({
+            _id: user._id,
+            username: user.username,
+            profilePicture: user.profilePicture || '',
+            isFriend: req.user.friends.some(friendId => friendId.toString() === user._id.toString())
+        }));
         
         res.status(200).json({ 
             success: true,
-            users: users.map(user => ({
-                _id: user._id,
-                username: user.username,
-                profilePicture: user.profilePicture || ''
-            }))
+            users: usersWithFriendStatus,
         })
     } catch (error) {
         console.log(error)

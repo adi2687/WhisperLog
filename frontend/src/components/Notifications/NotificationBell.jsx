@@ -169,14 +169,8 @@ const NotificationBell = () => {
         }
       );
 
-      // Update UI to show request was accepted
-      setNotifications(prev =>
-        prev.map(n =>
-          n._id === notificationId 
-            ? { ...n, status: 'accepted', isRead: true } 
-            : n
-        )
-      );
+      // Remove the notification from display after accepting
+      setNotifications(prev => prev.filter(n => n._id !== notificationId));
 
       // Refresh unread count
       fetchUnreadCount();

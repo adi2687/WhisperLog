@@ -51,7 +51,7 @@ router.post("/request", verifyToken, async (req, res) => {
         }).lean();
         
         console.log('Existing request check result:', existingRequest ? 'Found' : 'Not found', existingRequest || '');
-
+        console.log(existingRequest)
         if (existingRequest) {
             if (existingRequest.status === 'pending') {
                 return res.status(400).json({
@@ -212,7 +212,10 @@ router.patch('/request/accept', verifyToken, async (req, res) => {
         // Update the friend request status to accepted
         request.status = 'accepted';
         await request.save();
-
+        
+        // Remove the notification since the request has been accepted
+        // await Notification.findByIdAndDelete(notification._id);
+        
         // Add each user to the other's friends list
         await Promise.all([
             User.findByIdAndUpdate(
@@ -286,6 +289,43 @@ router.get('/notifications/unread-count', verifyToken, async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to get unread count',
+            error: error.message
+        });
+    }
+});
+
+// Mark notification as read
+router.patch('/notifications/:notificationId/read', verifyToken, async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        const userId = req.user.id;
+        
+        const notification = await Notification.findOneAndUpdate(
+            { 
+                _id: notificationId, 
+                userId: userId 
+            },
+            { isRead: true },
+            { new: true }
+        );
+        
+        if (!notification) {
+            return res.status(404).json({
+                success: false,
+                message: 'Notification not found'
+            });
+        }
+        
+        res.status(200).json({
+            success: true,
+            message: 'Notification marked as read',
+            notification
+        });
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to mark notification as read',
             error: error.message
         });
     }

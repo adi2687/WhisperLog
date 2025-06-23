@@ -18,6 +18,7 @@ import { CurrentUserProfileProvider } from './contexts/ProfileContext';
 import AnimatedList from './components/List/list';
 import Card from './components/profile/profilecard/card';
 import AddFriend from './components/AddFriend/AddFriend';
+import Message from './components/message/main'
 // imp
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -41,32 +42,28 @@ function App() {
       <AuthProvider>
         <WebSocketProvider>
           <ProfileProvider>
-            <div className="app">
-              <Navbar />
-              <main>
-                <Routes>
-                  <Route path="/" element={<Homepage />} />
-                  <Route path="/chat" element={<Main />} />
-                  <Route path="/showcasing" element={<Showcasing />} />
-                  <Route path="/intro" element={<Intro />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/profile/:username" element={<ProfileOthersPage />} />
-                  <Route 
-                    path="/profile" 
-                    element={
-                      <CurrentUserProfileProvider>
-                        <ProfilePage />
-                      </CurrentUserProfileProvider>
-                    } 
-                  />
-                  <Route path="*" element={<Notfound />} />
-                  <Route path="/list" element={<AnimatedList />} />
-                  <Route path="/profilecard" element={<Card />} />
-                  <Route path="/addFriend" element={<AddFriend />} />
-                </Routes>
-              </main>
-              <Footer />
-            </div>
+            <CurrentUserProfileProvider>
+              <div className="app">
+                <Navbar />
+                <main>
+                  <Routes>
+                    <Route path="/" element={<Homepage />} />
+                    <Route path="/chat" element={<Main />} />
+                    <Route path="/showcasing" element={<Showcasing />} />
+                    <Route path="/intro" element={<Intro />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/profile/:username" element={<ProfileOthersPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="*" element={<Notfound />} />
+                    <Route path="/list" element={<AnimatedList />} />
+                    <Route path="/profilecard" element={<Card />} />
+                    <Route path="/addFriend" element={<AddFriend />} />
+                    <Route path="/chat/:id" element={<Message />} />
+                  </Routes>
+                </main>
+                <Footer />
+              </div>
+            </CurrentUserProfileProvider>
           </ProfileProvider>
         </WebSocketProvider>
       </AuthProvider>

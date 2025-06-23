@@ -4,11 +4,15 @@ import axios from 'axios';
 import './profile.css';
 import { format } from 'date-fns';
 import AnimatedList from '../List/AnimatedList';
+import { useNavigate } from 'react-router-dom';
 
 const UserProfileSection = () => {
+  const navigate = useNavigate();
   const { profile, loading, error, fetchProfile } = useProfileCurrentUser();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [showFriendsList, setShowFriendsList] = useState([]);
+  const [friends, setFriends] = useState([]);
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioText, setBioText] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -200,6 +204,29 @@ const UserProfileSection = () => {
     setHasUnsavedChanges(hobbiesChanged || moviesChanged || musicChanged);
   }, [selectedHobbies, selectedMovies, selectedMusic, originalHobbies, originalMovies, originalMusic]);
 
+  // Fetch friends list
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        const response = await axios.get(
+          `${backendUrl}/api/profile/friends`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            withCredentials: true
+          }
+        );
+        // console.log(response.data.friends)
+        setFriends(response.data.friends || []);
+        setShowFriendsList(response.data.friends)
+      } catch (err) {
+        console.error('Error fetching friends:', err);
+      }
+    };
+
+    fetchFriends();
+  },[]);
   // Initialize form data when profile loads
   useEffect(() => {
     if (profile) {
@@ -313,11 +340,25 @@ const UserProfileSection = () => {
     }
   };
 
+  const removecookie=(name)=>{
+fetch(`${backendUrl}/logout`)
+.then(res=>res.json())
+.then(data=>{
+  if(data.success){
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    setIsLoggedIn(false)
+  }
+})
+  }
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
   if (error) return <div className="error-message">{error}</div>;
   if (!profile) return <div className="not-found">Profile not found</div>;
   return (
     <div className="profile-section">
+      {/* Friends List Modal - Moved to top */}
+      {/* {friendsList} */}
+
       {/* Common Save Button - Sticky at Bottom */}
       {hasUnsavedChanges && (
         <div className="common-save-container">
@@ -373,8 +414,33 @@ const UserProfileSection = () => {
           </div>
         </div>
         
-        <h1 className="username">@{profile.username}</h1>
-        <span className="stat-value">{profile.friends?.length || 0} Friends</span>
+        <div className="profile-header-row">
+          <h1 className="username">@{profile.username}</h1>
+          <button 
+            className="logout-btn"
+            onClick={() => {
+              // Clear local storage
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              
+              // Clear token cookie
+              document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+              removecookie("")
+              // Redirect to auth page
+              window.location.href = '/auth';
+            }}
+            title="Logout"
+          >
+            <i className="fas fa-sign-out-alt"></i>
+          </button>
+        </div>
+        <span 
+          className="stat-value clickable" 
+          onClick={() => setShowFriendsList(true)}
+          style={{ cursor: 'pointer' }}
+        >
+          {profile.friends?.length || 0} Friends
+        </span>
         
         {/* Bio Section */}
         <div className="bio-section">
@@ -439,7 +505,31 @@ const UserProfileSection = () => {
             </div>
           )}
         </div>
-        
+        {friends.length > 0 ? (
+          <div className="friends-section">
+            <h3>Friends</h3>
+            <div className="friends-list">
+              {friends.map((friend) => (
+                <div key={friend._id} className="friend-item">
+                  <div className="friend-item-content" onClick={() => navigate(`/profile/${friend._id}`)}>
+                    <img src={friend.profilePicture} alt={friend.username} />
+                    <span>{friend.username}</span>
+                  </div>
+                  <button 
+                    className="message-icon-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/chat?user=${friend.username}`);
+                    }}
+                    title="Message"
+                  >
+                    <i className="fas fa-comment-dots"></i>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="profile-sections-container">
           {/* Hobbies Section */}
           <div className="hobbies-section">
@@ -678,10 +768,6 @@ const UserProfileSection = () => {
           
           {/* Music Section */}
           </div>
-        
-        {/* User Details */}
-        
-        
         
       </div>
       {uploadError && <div className="error-message" style={{ marginTop: '10px' }}>{uploadError}</div>}

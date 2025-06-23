@@ -1,17 +1,13 @@
 import { Server } from 'socket.io';
 
-let io;
 const userSockets = new Map(); // userId -> socketId mapping
+const chatRooms = new Map(); // chatId -> Set of userIds
 
-const initSocket = (server) => {
-    io = new Server(server, {
-        cors: {
-            origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-            methods: ['GET', 'POST'],
-            credentials: true
-        }
-    });
-
+/**
+ * Sets up all socket event handlers
+ * @param {Object} io - The Socket.IO server instance
+ */
+const initSocketHandlers = (io) => {
     io.on('connection', (socket) => {
         console.log('New client connected:', socket.id);
 
@@ -23,11 +19,68 @@ const initSocket = (server) => {
             }
         });
 
+        // Join a chat room
+        socket.on('join_chat', ({ chatId, userId }) => {
+            if (chatId && userId) {
+                socket.join(chatId);
+                
+                // Track users in chat rooms
+                if (!chatRooms.has(chatId)) {
+                    chatRooms.set(chatId, new Set());
+                }
+                chatRooms.get(chatId).add(userId);
+                
+                console.log(`User ${userId} joined chat ${chatId}`);
+            }
+        });
+
+        // Handle new messages
+        socket.on('send_message', (messageData) => {
+            try {
+                const { chatId, senderId, receiverId, content } = messageData;
+                
+                // Broadcast the message to all users in the chat room
+                io.to(chatId).emit('new_message', {
+                    ...messageData,
+                    timestamp: new Date().toISOString()
+                });
+                
+                console.log(`Message sent in chat ${chatId} by user ${senderId}`);
+                
+                // Send notification to receiver if they're not in the chat
+                const receiverSocketId = userSockets.get(receiverId);
+                if (receiverSocketId && !io.sockets.sockets.get(receiverSocketId)?.rooms.has(chatId)) {
+                    io.to(receiverSocketId).emit('new_notification', {
+                        type: 'new_message',
+                        chatId,
+                        senderId,
+                        content,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (error) {
+                console.error('Error handling message:', error);
+            }
+        });
+
         // Handle disconnection
         socket.on('disconnect', () => {
-            // Remove the user from our mapping
+            console.log('Client disconnected:', socket.id);
+            
+            // Remove the user from our mapping and all chat rooms
             for (const [userId, socketId] of userSockets.entries()) {
                 if (socketId === socket.id) {
+                    // Remove user from all chat rooms
+                    for (const [chatId, users] of chatRooms.entries()) {
+                        if (users.has(userId)) {
+                            users.delete(userId);
+                            if (users.size === 0) {
+                                chatRooms.delete(chatId);
+                            }
+                        }
+                    }
+                    
+                    // Remove user from socket mapping
                     userSockets.delete(userId);
                     console.log(`User ${userId} disconnected`);
                     break;
@@ -39,43 +92,38 @@ const initSocket = (server) => {
 
 // Function to send a notification to a specific user
 const sendNotification = (userIdOrData, notificationData) => {
-    if (!io) {
-        console.error('Socket.IO not initialized');
-        return false;
-    }
-
-    // Handle both parameter formats:
-    // 1. sendNotification(userId, notification)
-    // 2. sendNotification({ userId, ...notification })
     let userId, notification;
     
+    // Handle both parameter formats
     if (typeof userIdOrData === 'string') {
-        // Format 1: userId, notification
         userId = userIdOrData;
         notification = notificationData;
-    } else if (userIdOrData && typeof userIdOrData === 'object') {
-        // Format 2: single object with userId and notification data
+    } else if (typeof userIdOrData === 'object') {
         userId = userIdOrData.userId;
-        notification = { ...userIdOrData };
+        notification = userIdOrData.notification;
     } else {
         console.error('Invalid parameters for sendNotification');
         return false;
     }
 
-    if (!userId) {
-        console.error('No userId provided for notification');
-        return false;
-    }
-
     const socketId = userSockets.get(userId);
     if (socketId) {
-        io.to(socketId).emit('newNotification', notification);
-        console.log(`Notification sent to user ${userId}`, notification);
-        return true;
-    } else {
-        console.log(`User ${userId} is not connected`);
-        return false;
+        const io = require('./api/app').io; // Get the shared io instance
+        if (io) {
+            io.to(socketId).emit('notification', notification);
+            console.log(`Notification sent to user ${userId}`, notification);
+            return true;
+        }
     }
+    
+    console.log(`User ${userId} is not connected`);
+    return false;
 };
 
-export { initSocket, sendNotification, io };
+// Export the necessary functions and variables
+export {
+    initSocketHandlers,
+    sendNotification,
+    userSockets,
+    chatRooms
+};

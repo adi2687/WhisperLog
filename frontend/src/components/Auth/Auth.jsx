@@ -24,7 +24,11 @@ const Auth = () => {
   
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_BACKEND_URL;
-
+useEffect(() => {
+  if (localStorage.getItem('token')) {
+    navigate('/profile');
+  }
+}, [navigate]);
   // Form validation
   useEffect(() => {
     if (!toggle) {

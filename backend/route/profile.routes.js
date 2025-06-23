@@ -23,11 +23,11 @@ cloudinary.v2.config({
   secure: true
 });
 
-console.log('Initialized Cloudinary with:', {
-  cloud_name: process.env.CLOUDINARY_NAME ? '✅' : '❌',
-  api_key: process.env.CLOUDINARY_API_KEY ? '✅' : '❌',
-  api_secret: process.env.CLOUDINARY_API_SECRET ? '✅' : '❌'
-});
+// console.log('Initialized Cloudinary with:', {
+//   cloud_name: process.env.CLOUDINARY_NAME ? '✅' : '❌',
+//   api_key: process.env.CLOUDINARY_API_KEY ? '✅' : '❌',
+//   api_secret: process.env.CLOUDINARY_API_SECRET ? '✅' : '❌'
+// });
 
 const router = express.Router();
 
@@ -178,5 +178,13 @@ router.put("/picture", verifyToken, upload.single('profilePicture'), async (req,
     });
   }
 });
-
+router.get("/friends",verifyToken,async (req,res)=>{
+  try {
+    const user = req.user;
+    const friends = await User.find({ _id: { $in: user.friends } }).select("_id username profilePicture")
+    res.status(200).json({ friends: friends });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+})
 export default router;

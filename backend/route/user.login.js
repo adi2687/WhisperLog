@@ -7,7 +7,7 @@ dotenv.config()
 const SECRET_KEY = process.env.SECRET_KEY
 const router = express.Router()
 router.post("",async (req,res)=>{
-    console.log(req.body)
+    // console.log(req.body)
     const {username,email,password}=req.body
     try {
         const user=await UserModel.findOne({email})

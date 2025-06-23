@@ -3,23 +3,33 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ProfileProvider } from '../../contexts/ProfileContext';
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import './profile.css';
+import './main.css';
 import { useProfile } from '../../contexts/ProfileContext';
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const ProfileContent = () => {
   const { profile, loading, error: profileError } = useProfile();
   const navigate = useNavigate();
-  const [isFriend, setIsFriend] = useState(false);
   const [isRequestSent, setIsRequestSent] = useState(false);
   const [friends, setFriends] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [friendError, setFriendError] = useState('');
   const [activeTab, setActiveTab] = useState('about');
-  const [error,setError] = useState('');
+  const [error, setError] = useState('');
+  const [isFriend, setIsFriend] = useState(false);
   // Check if this is the current user's profile
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const isCurrentUser = currentUser && currentUser._id === profile?._id;
+  
+  // Check if the current user is already a friend
+  useEffect(() => {
+    if (currentUser && profile?.friends) {
+      const isFriendCheck = profile.friends.some(
+        friend => friend._id === currentUser._id || friend === currentUser._id
+      );
+      setIsFriend(isFriendCheck);
+    }
+  }, [currentUser, profile]);
 // console.log('currentUser',currentUser)
 // console.log()
   // Fetch friends list
@@ -51,8 +61,8 @@ const ProfileContent = () => {
       }
       
       const response = await axios.post(
-        `${backendUrl}/api/friends/request`,
-        { userId: profile._id },
+        `${backendUrl}/friends/request`,
+        { userId: profile._id ,username:profile.username},
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -116,8 +126,20 @@ const ProfileContent = () => {
           </div>
           <h1 className="username">{profile.username}</h1>
           
-          {!isFriend&&!isCurrentUser&& (
-            <div className="profile-actions">
+          {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+          
+          <div className="profile-actions">
+            {isFriend && !isCurrentUser && (
+              <button 
+                className="action-button"
+                onClick={handleMessage}
+                style={{ marginRight: '10px' }}
+              >
+                Message
+              </button>
+            )}
+            
+            {!isFriend && !isCurrentUser && (
               <button 
                 className={`action-button ${isRequestSent ? 'requested' : ''}`}
                 onClick={handleAddFriend}
@@ -125,14 +147,15 @@ const ProfileContent = () => {
               >
                 {isLoading ? 'Sending...' : isRequestSent ? 'Request Sent' : 'Add Friend'}
               </button>
-              {friendError && <div className="error-message">{friendError}</div>}
-            </div>
-          )}
+            )}
+            
+            {friendError && <div className="error-message">{friendError}</div>}
+          </div>
           
           
         </div>
 
-        {profile.bio && <p className="profile-bio">{profile.bio}</p>}
+
 
         <div className="profile-stats">
           <div className="stat">

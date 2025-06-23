@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
+// In main.jsx
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import Chat from './chat'; 
+import Contacts from './contacts';
 
+export default function Main() {
+    const { id } = useParams();
+    const [receiver, setReceiver] = useState(null);
 
-function App() {
-
-
-
-  return (
-    <div>
-      <h2>Whisperlog Chat</h2>
-      <input type="text" name="Search friends" id="" />
-    </div>
-  );
+    return (
+        <div style={{display: 'flex'}}>
+            <Contacts onContactSelect={setReceiver} />
+            <Chat chatId={id} receiver={receiver} />
+        </div>
+    );
 }
-
-
-export default App;

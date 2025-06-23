@@ -4,7 +4,6 @@ import { Menu, X } from "lucide-react";
 import Logo from "/logo_main.png";
 import "./Navbar.css";
 import "./NavDropdown.css";
-import Input from "./input";
 import NotificationBell from "../Notifications/NotificationBell";
 
 const Navbar = () => {
@@ -33,9 +32,7 @@ useEffect(()=>{
           <Link to="/">
             <img src={Logo} alt="Outfit AI" className="logo-image" />
           </Link>
-          <div className="search-container">
-            <Input />
-          </div>
+          
         </div>
 
         <div className={`navbar-menu ${isOpen ? "active" : ""}`}>
