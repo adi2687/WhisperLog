@@ -26,7 +26,7 @@ router.post("", async (req, res) => {
         res.cookie("token", token, {
             httpOnly: true,
             secure: true,
-            sameSite: "strict",
+            sameSite: "None",
             maxAge: 24 * 60 * 60 * 1000
         })
         res.status(201).json({ message: "User registered successfully", user:newUser,token:token })
