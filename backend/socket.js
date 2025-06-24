@@ -1,4 +1,6 @@
 import { Server } from 'socket.io';
+import MessageModel from './models/message.model.js';
+import ChatModel from './models/chat.model.js';
 
 const userSockets = new Map(); // userId -> socketId mapping
 const chatRooms = new Map(); // chatId -> Set of userIds
@@ -15,53 +17,99 @@ const initSocketHandlers = (io) => {
         socket.on('register', (userId) => {
             if (userId) {
                 userSockets.set(userId, socket.id);
-                console.log(`User ${userId} connected with socket ${socket.id}`);
+                // console.log(User ${userId} connected with socket ${socket.id});
+            }
+        });
+
+        // Handle chat messages
+        socket.on('send_message', async (data) => {
+            try {
+                if (!data || !data.roomId || !data.message) {
+                    console.warn('Invalid message format:', data);
+                    return;
+                }
+
+                const { roomId, message: messageData } = data;
+                
+                // Save message to database
+                const newMessage = new MessageModel({
+                    senderId: messageData.senderId,
+                    receiverId: messageData.receiverId,
+                    message: messageData.content,
+                    chatId: roomId,
+                    isRead: false,
+                    timestamp: new Date()
+                });
+
+                const savedMessage = await newMessage.save();
+                
+                // Broadcast to room with saved message data
+                io.to(roomId).emit('receive_message', {
+                    roomId,
+                    message: {
+                        _id: savedMessage._id,
+                        senderId: savedMessage.senderId,
+                        content: savedMessage.message,
+                        timestamp: savedMessage.timestamp,
+                        chatId: savedMessage.chatId,
+                        isRead: savedMessage.isRead
+                    }
+                });
+                
+                // console.log(Message saved and sent to room ${roomId} by ${savedMessage.senderId || 'unknown'});
+                
+                // Emit delivery confirmation
+                if (messageData.tempId) {
+                    socket.emit('message_delivered', {
+                        success: true,
+                        tempId: messageData.tempId,
+                        messageId: savedMessage._id
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error handling send_message:', error);
+                // Notify sender of failure
+                socket.emit('message_error', {
+                    error: 'Failed to send message',
+                    tempId: data.message?.tempId,
+                    details: error.message
+                });
             }
         });
 
         // Join a chat room
-        socket.on('join_chat', ({ chatId, userId }) => {
-            if (chatId && userId) {
-                socket.join(chatId);
-                
-                // Track users in chat rooms
-                if (!chatRooms.has(chatId)) {
-                    chatRooms.set(chatId, new Set());
-                }
-                chatRooms.get(chatId).add(userId);
-                
-                console.log(`User ${userId} joined chat ${chatId}`);
-            }
-        });
-
-        // Handle new messages
-        socket.on('send_message', (messageData) => {
+        socket.on('join_room', (data) => {
             try {
-                const { chatId, senderId, receiverId, content } = messageData;
+                if (!data || !data.roomId) {
+                    console.warn('Invalid room join request:', data);
+                    return;
+                }
                 
-                // Broadcast the message to all users in the chat room
-                io.to(chatId).emit('new_message', {
-                    ...messageData,
+                const { roomId, userId } = data;
+                
+                // Join the room
+                socket.join(roomId);
+                
+                // Track room membership
+                if (!chatRooms.has(roomId)) {
+                    chatRooms.set(roomId, new Set());
+                }
+                chatRooms.get(roomId).add(userId || socket.id);
+                
+                // console.log(Socket ${socket.id} joined room ${roomId});
+                
+                // Notify others in the room
+                socket.to(roomId).emit('user_joined', {
+                    roomId,
+                    userId: userId || socket.id,
                     timestamp: new Date().toISOString()
                 });
-                
-                console.log(`Message sent in chat ${chatId} by user ${senderId}`);
-                
-                // Send notification to receiver if they're not in the chat
-                const receiverSocketId = userSockets.get(receiverId);
-                if (receiverSocketId && !io.sockets.sockets.get(receiverSocketId)?.rooms.has(chatId)) {
-                    io.to(receiverSocketId).emit('new_notification', {
-                        type: 'new_message',
-                        chatId,
-                        senderId,
-                        content,
-                        timestamp: new Date().toISOString()
-                    });
-                }
             } catch (error) {
-                console.error('Error handling message:', error);
+                console.error('Error joining room:', error);
             }
         });
+        
 
         // Handle disconnection
         socket.on('disconnect', () => {
@@ -82,7 +130,7 @@ const initSocketHandlers = (io) => {
                     
                     // Remove user from socket mapping
                     userSockets.delete(userId);
-                    console.log(`User ${userId} disconnected`);
+                    // console.log(User ${userId} disconnected);
                     break;
                 }
             }
@@ -108,15 +156,15 @@ const sendNotification = (userIdOrData, notificationData) => {
 
     const socketId = userSockets.get(userId);
     if (socketId) {
-        const io = require('./api/app').io; // Get the shared io instance
+        const io = require('./api/app.js').io; // Get the shared io instance
         if (io) {
             io.to(socketId).emit('notification', notification);
-            console.log(`Notification sent to user ${userId}`, notification);
+            // console.log(Notification sent to user ${userId}, notification);
             return true;
         }
     }
     
-    console.log(`User ${userId} is not connected`);
+    // console.log(User ${userId} is not connected);
     return false;
 };
 

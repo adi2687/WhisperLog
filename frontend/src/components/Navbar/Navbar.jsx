@@ -4,7 +4,7 @@ import { Menu, X } from "lucide-react";
 import Logo from "/logo_main.png";
 import "./Navbar.css";
 import "./NavDropdown.css";
-import NotificationBell from "../Notifications/NotificationBell";
+// import NotificationBell from "../Notifications/NotificationBell";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +45,7 @@ useEffect(()=>{
         <div className="navbar-icons">
           {isLoggedIn ? (
             <>
-              <NotificationBell />
+              {/* <NotificationBell /> */}
               <Link to="/profile" className="icon">Profile</Link>
             </>
           ) : (

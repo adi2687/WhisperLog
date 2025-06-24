@@ -15,7 +15,7 @@ const NotificationBell = () => {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_BACKEND_URL;
-  const { socket, notifications: realtimeNotifications } = useWebSocket();
+  const { notifications: realtimeNotifications } = useWebSocket();
   const { user } = useAuth();
   
   // Combine server and real-time notifications

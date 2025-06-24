@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { WebSocketProvider } from './contexts/WebSocketContext';
+// import { WebSocketProvider } from './contexts/WebSocketContext';
 import Loader from './components/Loader/Loader';
 import Navbar from "./components/Navbar/Navbar";
 import Homepage from './components/Homepage/Homepage';
@@ -40,7 +40,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <WebSocketProvider>
+        {/* <WebSocketProvider> */}
           <ProfileProvider>
             <CurrentUserProfileProvider>
               <div className="app">
@@ -65,7 +65,7 @@ function App() {
               </div>
             </CurrentUserProfileProvider>
           </ProfileProvider>
-        </WebSocketProvider>
+        {/* </WebSocketProvider> */}
       </AuthProvider>
     </Router>
   );

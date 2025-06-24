@@ -19,12 +19,10 @@ function makeRandomId() {
 }
 
 router.post("/", async (req, res) => {
-    console.log('Received message data:', req.body);
     const { senderId, receiverId, message, chatId } = req.body;
     
     // Validate required fields
     if (!senderId || !receiverId || !message || !chatId) {
-        console.error('Missing required fields:', { senderId, receiverId, message, chatId });
         return res.status(400).json({ 
             message: "Missing required fields",
             required: ["senderId", "receiverId", "message", "chatId"],
@@ -43,7 +41,6 @@ router.post("/", async (req, res) => {
         });
         
         const savedMessage = await newMessage.save();
-        console.log('Message saved successfully:', savedMessage);
         
         // Emit socket event for real-time update
         if (req.app.get('io')) {
@@ -55,7 +52,6 @@ router.post("/", async (req, res) => {
             data: savedMessage
         });
     } catch (error) {
-        console.error('Error saving message:', error);
         res.status(500).json({ 
             message: "Internal server error",
             error: error.message,
@@ -65,16 +61,13 @@ router.post("/", async (req, res) => {
 })
 
 // Get all messages for a specific chat
-router.get("/:chatId", async (req, res) => {
+router.get("/:chatId", async (req, res) => {    
     try {
-        console.log('in the chat')
         const { chatId } = req.params;
         const messages = await MessageModel.find({ chatId })
             .sort({ timestamp: 1 });
-        console.log(messages)
-        res.status(200).json({ messages });
+            res.status(200).json({ messages });
     } catch (error) {
-        console.error('Error fetching messages:', error);
         res.status(500).json({ message: 'Error fetching messages', error: error.message });
     }
 });
@@ -82,7 +75,6 @@ router.get("/:chatId", async (req, res) => {
 router.post("/findid", async (req, res) => {
     try {
         const { senderId, receiverId } = req.body
-        console.log(senderId, receiverId)
         const existchatbetweenusers = await ChatModel.findOne({
             $or: [
                 { senderId: receiverId, receiverId: senderId },
@@ -92,7 +84,6 @@ router.post("/findid", async (req, res) => {
 
         if (!existchatbetweenusers) {
             const chatId = makeRandomId()
-            // console.log(chatId)
             const newChat = new ChatModel({
                 senderId,
                 receiverId,
@@ -107,7 +98,6 @@ router.post("/findid", async (req, res) => {
         }
 
     } catch (error) {
-        console.log(error)
         res.status(500).json({ message: "Internal server error" })
     }
 })
