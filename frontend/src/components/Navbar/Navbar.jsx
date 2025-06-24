@@ -4,7 +4,7 @@ import { Menu, X } from "lucide-react";
 import Logo from "/logo_main.png";
 import "./Navbar.css";
 import "./NavDropdown.css";
- 
+import NotificationBell from "../Notifications/NotificationBell";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [check, setCheck] = useState(null);
@@ -35,8 +35,9 @@ const Navbar = () => {
           <Link to="addFriend" className="nav-link" onClick={() => setIsOpen(false)}>Add Friend</Link>
           <Link to="/anonymouschat" className="nav-link" onClick={() => setIsOpen(false)}>Anonymous Chat</Link>
         </div>
- 
         <div className="navbar-icons">
+        <NotificationBell />
+
           {isLoggedIn ? (
             <Link to="/profile" className="icon">Profile</Link>
           ) : (
