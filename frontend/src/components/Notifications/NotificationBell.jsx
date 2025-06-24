@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, UserPlus, MessageSquare, ThumbsUp, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { useWebSocket } from '../../contexts/WebSocketContext';
-import { useAuth } from '../../contexts/AuthContext';
 import './NotificationBell.css';
 
 const NotificationBell = () => {
@@ -12,36 +10,59 @@ const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const dropdownRef = useRef(null);
+  const listRef = useRef(null);
   const navigate = useNavigate();
   const apiUrl = import.meta.env.VITE_BACKEND_URL;
-  const { notifications: realtimeNotifications } = useWebSocket();
-  const { user } = useAuth();
-  
-  // Combine server and real-time notifications
-  useEffect(() => {
-    if (realtimeNotifications.length > 0) {
-      setNotifications(prev => [
-        ...realtimeNotifications,
-        ...prev.filter(n => !realtimeNotifications.some(rn => rn.id === n.id))
-      ]);
-      setUnreadCount(prev => prev + 1);
-    }
-  }, [realtimeNotifications]);
+  const pageSize = 10;
 
   // Fetch notifications when dropdown is opened
   useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen]);
+    const fetchNotifications = async () => {
+      if (isOpen) {
+        try {
+          setIsLoading(true);
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`${apiUrl}/notification/all`, {
+            params: { page: 1, limit: pageSize },
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          // The API returns an array of notifications directly
+          const notifications = Array.isArray(response.data) ? response.data : [];
+          setNotifications(notifications);
+          setHasMore(notifications.length === pageSize);
+          setPage(1);
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
 
-  // Poll for new notifications
+    fetchNotifications();
+  }, [isOpen, apiUrl]);
+
+  // Fetch unread count on mount and periodically
   useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${apiUrl}/notification/unread-count`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setUnreadCount(response.data?.count || 0);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // Check every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [apiUrl]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -52,63 +73,59 @@ const NotificationBell = () => {
     }
 
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchNotifications = async () => {
+  // Handle infinite scroll
+  useEffect(() => {
+    const listElement = listRef.current;
+    if (!listElement || !hasMore || isLoading) return;
+
+    const handleScroll = () => {
+      if (listElement.scrollTop + listElement.clientHeight >= listElement.scrollHeight - 10) {
+        loadMoreNotifications();
+      }
+    };
+
+    listElement.addEventListener('scroll', handleScroll);
+    return () => listElement.removeEventListener('scroll', handleScroll);
+  }, [hasMore, isLoading]);
+
+  const loadMoreNotifications = async () => {
+    if (isLoading || !hasMore) return;
+    
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${apiUrl}/friends/notifications`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const nextPage = page + 1;
+      const response = await axios.get(`${apiUrl}/notification/all`, {
+        params: { page: nextPage, limit: pageSize },
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      setNotifications(response.data || []);
+
+      const newNotifications = response.data.notifications || [];
+      setNotifications(prev => [...prev, ...newNotifications]);
+      setHasMore(newNotifications.length === pageSize);
+      setPage(nextPage);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error loading more notifications:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchUnreadCount = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${apiUrl}/friends/notifications/unread-count`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setUnreadCount(response.data.count || 0);
-    } catch (error) {
-      console.error('Error fetching unread count:', error);
     }
   };
 
   const clearNotification = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(
-        `${apiUrl}/friends/notifications/${notificationId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+      await axios.delete(`${apiUrl}/notification/${notificationId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       
-      // Update local state to remove the notification
       setNotifications(prev => prev.filter(n => n._id !== notificationId));
-      
-      // Update unread count if the notification was unread
       setUnreadCount(prev => {
         const notification = notifications.find(n => n._id === notificationId);
         return notification && !notification.isRead ? Math.max(0, prev - 1) : prev;
       });
-      
     } catch (error) {
       console.error('Error clearing notification:', error);
     }
@@ -117,117 +134,81 @@ const NotificationBell = () => {
   const markAllAsRead = async () => {
     try {
       const token = localStorage.getItem('token');
-      // Get all unread notification IDs
-      const unreadNotifications = notifications.filter(n => !n.isRead);
+      const unreadIds = notifications.filter(n => !n.isRead).map(n => n._id);
       
-      if (unreadNotifications.length === 0) return;
+      if (unreadIds.length === 0) return;
       
-      // Mark all as read on the server
-      await Promise.all(
-        unreadNotifications.map(notification => 
-          axios.patch(
-            `${apiUrl}/friends/notifications/${notification._id}/read`,
-            {},
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          )
-        )
+      await axios.patch(
+        `${apiUrl}/notification/mark-all-read`,
+        { notificationIds: unreadIds },
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       
-      // Update local state
       setNotifications(prev => 
-        prev.map(n => ({
-          ...n,
-          isRead: true
-        }))
+        prev.map(n => n.isRead ? n : { ...n, isRead: true })
       );
-      
-      // Update unread count
       setUnreadCount(0);
-      
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
   };
 
-  const handleAcceptFriendRequest = async (notificationId, senderId, e) => {
+  const handleAcceptFriendRequest = async (requestId, senderId, e) => {
     e.stopPropagation();
     try {
       const token = localStorage.getItem('token');
-      await axios.patch(
-        `${apiUrl}/friends/request/accept`,
-        { notificationId: notificationId,senderid:senderId }, // Changed from requestId to notificationId
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      // Remove the notification from display after accepting
-      setNotifications(prev => prev.filter(n => n._id !== notificationId));
-
-      // Refresh unread count
-      fetchUnreadCount();
-      
+      const response = await fetch(`${apiUrl}/friends/request/accept`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requestId, senderId })
+      });
+      const data = await response.json();
+      console.log(data);
+      setNotifications(prev => prev.filter(n => n._id !== requestId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error accepting friend request:', error);
     }
   };
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (notification) => {
+    if (notification.isRead) return;
+    
     try {
       const token = localStorage.getItem('token');
       await axios.patch(
-        `${apiUrl}/friends/notifications/${notificationId}/read`,
+        `${apiUrl}/notification/${notification._id}/read`,
         {},
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
       
-      // Update local state
       setNotifications(prev => 
-        prev.map(n => 
-          n._id === notificationId ? { ...n, isRead: true } : n
-        )
+        prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
       );
-      
       setUnreadCount(prev => Math.max(0, prev - 1));
-      
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   };
 
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'FRIEND_REQUEST':
-        return <UserPlus size={16} />;
-      case 'MESSAGE':
-        return <MessageSquare size={16} />;
-      case 'LIKE':
-      case 'COMMENT':
-        return <ThumbsUp size={16} />;
-      default:
-        return <Bell size={16} />;
-    }
-  };
-
   const handleNotificationClick = (notification) => {
-    markAsRead(notification._id);
+    if (!notification.isRead) {
+      markAsRead(notification);
+    }
     if (notification.link) {
       navigate(notification.link);
     }
     setIsOpen(false);
+  };
+
+  const getNotificationIcon = (notification) => {
+    // For friend requests, show UserPlus icon, otherwise show Bell
+    return notification.status === 'pending' ? 
+      <UserPlus size={16} /> : 
+      <Bell size={16} />;
   };
 
   return (
@@ -270,41 +251,44 @@ const NotificationBell = () => {
               </div>
             </div>
 
-            {isLoading ? (
-              <div className="loading">Loading...</div>
-            ) : notifications.length === 0 ? (
-              <div className="no-notifications">No new notifications</div>
-            ) : (
-              <div className="notifications-list">
-                {notifications.map((notification) => (
+            <div className="notifications-list" ref={listRef}>
+              {isLoading && notifications.length === 0 ? (
+                <div className="loading">Loading...</div>
+              ) : notifications.length === 0 ? (
+                <div className="no-notifications">No new notifications</div>
+              ) : (
+                notifications.map((notification) => (
                   <div 
-                    key={notification._id || notification.timestamp} 
+                    key={notification._id} 
                     className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="notification-icon">
-                      {getNotificationIcon(notification.type)}
+                      {getNotificationIcon(notification)}
                       {notification.senderProfilePicture && (
                         <img 
                           src={notification.senderProfilePicture} 
-                          alt={notification.senderName || 'User'}
+                          alt="Sender"
                           className="notification-sender-avatar"
                         />
                       )}
                     </div>
                     <div className="notification-content">
-                      <p className="notification-message">{notification.message}</p>
+                      <p className="notification-message">{notification.notification}</p>
                       <div className="notification-meta">
                         <span className="notification-time">
-                          {new Date(notification.timestamp || notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(notification.createdAt).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
                         </span>
-                        <span className="notification-sender">
-                          {notification.senderName || 'User'}
+                        <span className="notification-date">
+                          {new Date(notification.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
                     <div className="notification-actions">
-                      {notification.type === 'FRIEND_REQUEST' && notification.status !== 'accepted' && (
+                      {notification.status === 'pending' && (
                         <button
                           className="accept-request-btn"
                           onClick={(e) => handleAcceptFriendRequest(notification._id, notification.senderId, e)}
@@ -313,12 +297,12 @@ const NotificationBell = () => {
                           <Check size={16} />
                         </button>
                       )}
-                      {!notification.isRead && notification.type !== 'FRIEND_REQUEST' && (
+                      {!notification.isRead && notification.status !== 'pending' && (
                         <button 
                           className="mark-read-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            markAsRead(notification._id);
+                            markAsRead(notification);
                           }}
                           title="Mark as read"
                         >
@@ -329,7 +313,7 @@ const NotificationBell = () => {
                         className="clear-notification-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          clearNotification(notification._id || notification.timestamp);
+                          clearNotification(notification._id);
                         }}
                         title="Dismiss"
                       >
@@ -337,9 +321,15 @@ const NotificationBell = () => {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+              {isLoading && notifications.length > 0 && (
+                <div className="loading-more">Loading more...</div>
+              )}
+              {!hasMore && notifications.length > 0 && (
+                <div className="no-more-notifications">No more notifications</div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

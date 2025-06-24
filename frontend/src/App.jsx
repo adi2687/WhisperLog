@@ -19,8 +19,11 @@ import AnimatedList from './components/List/list';
 import Card from './components/profile/profilecard/card';
 import AddFriend from './components/AddFriend/AddFriend';
 import Message from './components/message/main'
+
 // imp
 // Protected route component
+
+import  Notification from './components/notifications/notificationBell'
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
@@ -59,6 +62,7 @@ function App() {
                     <Route path="/profilecard" element={<Card />} />
                     <Route path="/addFriend" element={<AddFriend />} />
                     <Route path="/chat/:id" element={<Message />} />
+                    <Route path="/notification" element={<Notification />} />
                   </Routes>
                 </main>
                 <Footer />

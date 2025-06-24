@@ -99,8 +99,9 @@ router.post("/request", verifyToken, async (req, res) => {
         };
         
         console.log('Creating notification with data:', JSON.stringify(notificationData, null, 2));
-        
+        console.log('here')
         const notification = new Notification(notificationData);
+        console.log('done')
         console.log('About to save notification...');
         
         const savedNotification = await notification.save();
@@ -119,7 +120,7 @@ router.post("/request", verifyToken, async (req, res) => {
         };
         
         console.log('Sending real-time notification:', notificationDataWS);
-        const notificationSent = await sendNotification(notificationDataWS);
+        const notificationSent = sendNotification(notificationDataWS);
         console.log('Real-time notification sent successfully');
         
         // Send success response
@@ -133,7 +134,7 @@ router.post("/request", verifyToken, async (req, res) => {
 
     } catch (error) {
         console.error('Error sending friend request:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false,
             message: 'Failed to send friend request',
             error: error.message 
@@ -163,41 +164,17 @@ router.get('/notifications', verifyToken, async (req, res) => {
 // Accept friend request
 router.patch('/request/accept', verifyToken, async (req, res) => {
     try {
+        console.log(req.body)
         const { notificationId } = req.body;
         const userId = req.user.id;
-        const recieverid = req.body.senderid;
+        const requestId = req.body.requestId;
         const senderusername=req.user.username
-        if (!notificationId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Notification ID is required'
-            });
-        }
+        // console.log(notificationId)
+        
 
         // Find the notification to get the friend request ID
-        const notification = await Notification.findOne({
-            _id: notificationId,
-            userId: userId,
-            type: 'FRIEND_REQUEST'
-        });
-// console.log(notification)
-        if (!notification) {
-            return res.status(404).json({
-                success: false,
-                message: 'Friend request notification not found'
-            });
-        }
-// console.log(notification.relatedRequestId)
-        if (!notification.relatedRequestId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid friend request notification'
-            });
-        }
-
-        // Find and update the friend request
         const request = await FriendRequest.findOne({
-            _id: notification.relatedRequestId,
+            _id: requestId,
             receiverId: userId,
             status: 'pending'
         });
@@ -213,10 +190,6 @@ router.patch('/request/accept', verifyToken, async (req, res) => {
         request.status = 'accepted';
         await request.save();
         
-        // Remove the notification since the request has been accepted
-        // await Notification.findByIdAndDelete(notification._id);
-        
-        // Add each user to the other's friends list
         await Promise.all([
             User.findByIdAndUpdate(
                 request.senderId,
@@ -229,7 +202,7 @@ router.patch('/request/accept', verifyToken, async (req, res) => {
         ]);
 console.log('saved till here')
         // Create notification for the requester
-        const receiver = await User.findById(recieverid).select('username profilePicture');
+        const receiver = await User.findById(userId).select('username profilePicture');
         // console.log(receiver)
         const acceptNotification = new Notification({
             userId: request.senderId,
@@ -251,6 +224,10 @@ console.log('saved till here')
         });
 
         // Mark the original notification as read
+        const notification = await Notification.findOne({
+            _id: requestId,
+            type: 'FRIEND_REQUEST'
+        });
         notification.isRead = true;
         await notification.save();
 
