@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -23,22 +23,10 @@ import Message from './components/message/main'
 // imp
 // Protected route component
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return <Loader />;
-  }
-  
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  return children;
-};
+
 
 function App() {
-
+  
   return (
     <Router>
       <AuthProvider>

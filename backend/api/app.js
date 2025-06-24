@@ -21,6 +21,7 @@ import friendRequestRoute from '../route/friendrequest.route.js';
 import logoutRoute from '../route/logout.route.js';
 import messageRoute from '../route/message.route.js';
 import notificationRoute from '../route/sendnotification.route.js';
+
 const PORT = process.env.PORT || 5000;
 const frontend=process.env.FRONTEND_URL;
 const app = express();
@@ -66,6 +67,8 @@ app.use('/friends', friendRequestRoute);
 app.use('/logout', logoutRoute);
 app.use('/message', messageRoute);
 app.use('/notification', notificationRoute);
+// Mount auth routes
+
 
 const server = http.createServer(app);
 
@@ -81,32 +84,59 @@ const io = new Server(server, {
 });
 
 const chatMessages = {};
+import messageModel from '../models/message.model.js'; 
 
 io.on('connection', (socket) => {
   console.log('a user connected', socket.id);
 
-  socket.on('joinchat', ({ chatId }) => {
+  socket.on('joinchat', async ({ chatId }) => {
     if (!chatId) return;
     socket.join(chatId);
     console.log('joined chat', chatId);
 
     // Send existing messages to the new client
-    const messages = chatMessages[chatId] || [];
-    socket.emit('loadMessages', messages);
+    try {
+      const messages = await messageModel.find({ chatId }).lean();
+      socket.emit('loadMessages', messages);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
   });
 
-  socket.on('message', ({ chatId, message }) => {
-    const msgObj = { message, timestamp: Date.now() };
-
-    // Save the message in memory
-    if (!chatMessages[chatId]) {
-      chatMessages[chatId] = [];
+  socket.on('message', async ({ chatId, message, senderId, receiverId }) => {
+    try {
+      console.log('New message:', { chatId, senderId, receiverId, message });
+      
+      // Create and save the message
+      const newMessage = new messageModel({
+        chatId,
+        message,
+        timestamp: Date.now(),
+        senderId,
+        receiverId,
+        isRead: false
+      });
+      
+      const savedMessage = await newMessage.save();
+      
+      // Convert to plain object and remove any circular references
+      const messageObj = savedMessage.toObject();
+      
+      // Send the message to all clients in the room
+      io.to(chatId).emit('message', {
+        _id: messageObj._id,
+        chatId: messageObj.chatId,
+        message: messageObj.message,
+        timestamp: messageObj.timestamp,
+        senderId: messageObj.senderId,
+        receiverId: messageObj.receiverId,
+        isRead: messageObj.isRead
+      });
+      
+      console.log('Message saved and emitted:', messageObj);
+    } catch (error) {
+      console.error('Error handling message:', error);
     }
-    chatMessages[chatId].push(msgObj);
-
-    // Send the message to all clients in the room
-    io.to(chatId).emit('message', msgObj);
-    console.log('message sent', msgObj);
   });
 });
 

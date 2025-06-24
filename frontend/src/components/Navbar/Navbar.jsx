@@ -36,8 +36,7 @@ const Navbar = () => {
           <Link to="/anonymouschat" className="nav-link" onClick={() => setIsOpen(false)}>Anonymous Chat</Link>
         </div>
         <div className="navbar-icons">
-        <NotificationBell />
-
+          <NotificationBell />
           {isLoggedIn ? (
             <Link to="/profile" className="icon">Profile</Link>
           ) : (

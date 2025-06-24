@@ -27,8 +27,9 @@ export default function Chat({ chatId }) {
 
   // Send message
   const sendMessage = () => {
+    // console.log(chatId,user._id,receiver._id,message)
     if (message.trim()) {
-      socket.emit('message', { chatId, message });
+      socket.emit('message', { chatId, message,senderId:user._id,receiverId:receiver });
       setMessage('');
     }
   };
