@@ -99,12 +99,12 @@ export default function Contacts() {
                             onClick={()=>findchatid(friend._id)}
                         >
                             <img
-                                src={friend.profilePicture || 'https://via.placeholder.com/48'}
+                                src={friend.profilePicture || '/default-avatar.svg'}
                                 alt={friend.username}
                                 className="user-pic"
                                 onError={(e) => {
                                     e.target.onerror = null;
-                                    e.target.src = 'https://via.placeholder.com/48';
+                                    e.target.src = '/default-avatar.svg';
                                 }}
                             />
                             <div className="contact-info">

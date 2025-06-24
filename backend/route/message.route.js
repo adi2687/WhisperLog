@@ -20,7 +20,7 @@ function makeRandomId() {
 
 router.post("/", async (req, res) => {
     const { senderId, receiverId, message, chatId } = req.body;
-    
+    console.log(req.body)
     // Validate required fields
     if (!senderId || !receiverId || !message || !chatId) {
         return res.status(400).json({ 

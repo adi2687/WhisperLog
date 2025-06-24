@@ -20,7 +20,7 @@ import searchnewfriendsRoute from '../route/searchnewfriends.route.js';
 import friendRequestRoute from '../route/friendrequest.route.js';
 import logoutRoute from '../route/logout.route.js';
 import messageRoute from '../route/message.route.js';
-
+import notificationRoute from '../route/sendnotification.route.js';
 const PORT = process.env.PORT || 5000;
 const frontend=process.env.FRONTEND_URL;
 const app = express();
@@ -65,6 +65,7 @@ app.use('/search/newfriends', searchnewfriendsRoute);
 app.use('/friends', friendRequestRoute);
 app.use('/logout', logoutRoute);
 app.use('/message', messageRoute);
+app.use('/notification', notificationRoute);
 
 const server = http.createServer(app);
 
@@ -79,8 +80,35 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
+const chatMessages = {};
 
+io.on('connection', (socket) => {
+  console.log('a user connected', socket.id);
 
+  socket.on('joinchat', ({ chatId }) => {
+    if (!chatId) return;
+    socket.join(chatId);
+    console.log('joined chat', chatId);
+
+    // Send existing messages to the new client
+    const messages = chatMessages[chatId] || [];
+    socket.emit('loadMessages', messages);
+  });
+
+  socket.on('message', ({ chatId, message }) => {
+    const msgObj = { message, timestamp: Date.now() };
+
+    // Save the message in memory
+    if (!chatMessages[chatId]) {
+      chatMessages[chatId] = [];
+    }
+    chatMessages[chatId].push(msgObj);
+
+    // Send the message to all clients in the room
+    io.to(chatId).emit('message', msgObj);
+    console.log('message sent', msgObj);
+  });
+});
 
 
 server.listen(PORT, '0.0.0.0', () => {
