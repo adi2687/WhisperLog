@@ -2,13 +2,12 @@
 .main-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
   width: 100%;
   overflow: hidden;
   background-color: #121212;
-  border:1px solid blue;
   height:95vh;
-  position: fixed;
+  margin-top:0;
+  position: absolute;
 }
 
 .main-content {
@@ -38,7 +37,14 @@
     transform: translateX(0);
     z-index: 2;
   }
-  
+  .main-container{
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
+    height: 100svh;
+  }
   .chat-panel {
     transform: translateX(100%);
     z-index: 1;
