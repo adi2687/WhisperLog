@@ -19,7 +19,9 @@ const Navbar = () => {
       setIsLoggedIn(true)
     }
   },[islogged])
-  
+  if (location.pathname.startsWith("/chat")){
+    return null
+  }
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -32,7 +34,7 @@ const Navbar = () => {
         <div className={`navbar-menu ${isOpen ? "active" : ""}`}>
           <Link to="/chat" className="nav-link" onClick={() => setIsOpen(false)}>Chat</Link>
 
-          <Link to="addFriend" className="nav-link" onClick={() => setIsOpen(false)}>Add Friend</Link>
+          <Link to="/addFriend" className="nav-link" onClick={() => setIsOpen(false)}>Add Friend</Link>
           <Link to="/anonymouschat" className="nav-link" onClick={() => setIsOpen(false)}>Anonymous Chat</Link>
         </div>
         <div className="navbar-icons">
@@ -51,6 +53,7 @@ const Navbar = () => {
       {/* Mobile Menu */}
       <div className={`navbar-mobile-menu ${isOpen ? "open" : ""}`}>
         <Link to="/chat" className="mobile-link" onClick={() => setIsOpen(false)}>Chat</Link>
+        <Link to="/addFriend" className="mobile-link" onClick={() => setIsOpen(false)}>Add Friend</Link>
         <Link to="/anonymouschat" className="mobile-link" onClick={() => setIsOpen(false)}>Anonymous Chat</Link>
         
       </div>
