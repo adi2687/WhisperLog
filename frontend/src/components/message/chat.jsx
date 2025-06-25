@@ -352,11 +352,12 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         ...(fileData && fileData)
       });
 
-      // Clear the input and selected files/GIF
+      // Clear the input and selected files/GIF/video
       setMessage('');
       setSelectedImage(null);
       setSelectedFile(null);
       setSelectedGif(null);
+      setSelectedVideo(null);
     } catch (error) {
       console.error('Error sending message:', error);
       alert(error.message || 'Failed to send message');
