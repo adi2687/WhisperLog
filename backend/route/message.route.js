@@ -33,12 +33,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configure Cloudinary storage for chat images
-const chatImageStorage = new CloudinaryStorage({
+// Configure Cloudinary storage for chat files
+const chatFileStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'whisperlog/chat-images',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    folder: 'whisperlog/chat-files',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip'],
     transformation: [
       { width: 1000, height: 1000, crop: 'limit', quality: 'auto' },
       { fetch_format: 'auto' }
@@ -46,10 +47,10 @@ const chatImageStorage = new CloudinaryStorage({
   },
 });
 
-// Configure multer for file uploads
-const upload = multer({
-  storage: chatImageStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+// Configure multer for image uploads
+const uploadImage = multer({
+  storage: chatFileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for images
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
@@ -60,8 +61,36 @@ const upload = multer({
   },
 });
 
+// Configure multer for file uploads (non-images)
+const uploadFile = multer({
+  storage: chatFileStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for other files
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/x-rar-compressed'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      console.log('File type allowed:', file.mimetype);
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type'));
+    }
+  },
+});
+
 // Endpoint to handle image uploads
-router.post('/upload-image', upload.single('image'), async (req, res) => {
+router.post('/upload-image', uploadImage.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No image file provided' });
@@ -72,12 +101,13 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
     
     res.status(200).json({ 
       url: imageUrl,
-      publicId: req.file.filename
+      publicId: req.file.filename,
+      type: 'image'
     });
   } catch (error) {
     console.error('Error uploading image:', error);
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'File size too large. Maximum 5MB allowed.' });
+      return res.status(400).json({ message: 'File size too large. Maximum 5MB allowed for images.' });
     } else if (error.message.includes('file type')) {
       return res.status(400).json({ message: error.message });
     }
@@ -88,13 +118,48 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
-    const { senderId, receiverId, message, chatId, imageUrl } = req.body;
+// Endpoint to handle file uploads
+router.post('/upload-file', uploadFile.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file provided' });
+    }
+
+    // Get file details
+    const fileUrl = req.file.path;
+    const fileName = req.file.originalname;
+    const fileType = req.file.mimetype;
+    const fileSize = req.file.size;
     
-    // Validate that either message or imageUrl is provided
-    if ((!message || message.trim() === '') && !imageUrl) {
+    res.status(200).json({ 
+      url: fileUrl,
+      fileName,
+      fileType,
+      fileSize,
+      publicId: req.file.filename,
+      type: 'file'
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File size too large. Maximum 10MB allowed for files.' });
+    } else if (error.message.includes('file type')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ 
+      message: 'Error uploading file', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+router.post("/", async (req, res) => {
+    const { senderId, receiverId, message, chatId, imageUrl, fileUrl, fileName, fileType, fileSize } = req.body;
+    
+    // Validate that either message, imageUrl, or fileUrl is provided
+    if ((!message || message.trim() === '') && !imageUrl && !fileUrl) {
         return res.status(400).json({ 
-            message: "Either message text or image is required",
+            message: "Either message text, image, or file is required",
             received: Object.keys(req.body)
         });
     }
@@ -112,11 +177,15 @@ router.post("/", async (req, res) => {
         const newMessage = new MessageModel({
             senderId,
             receiverId,
-            message: message || '', // Make message optional if image is present
+            message: message || '', // Make message optional if file/image is present
             timestamp: Date.now(),
             isRead: false,
             chatId,
-            imageUrl: imageUrl || null
+            imageUrl: imageUrl || null,
+            fileUrl: fileUrl || null,
+            fileName: fileName || null,
+            fileType: fileType || null,
+            fileSize: fileSize || null
         });
         
         const savedMessage = await newMessage.save();

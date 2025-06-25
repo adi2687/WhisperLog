@@ -13,7 +13,7 @@ const messageSchema=new mongoose.Schema({
         type: String,
         required: function() {
             // Message is required only if there's no image
-            return !this.imageUrl;
+            return !this.imageUrl && !this.fileUrl;
         },
         default: ''
     },
@@ -26,11 +26,27 @@ const messageSchema=new mongoose.Schema({
         default:false
     },
     chatId:{
-        type:String,
+        type:String, 
         required:true
     },
     imageUrl: {
         type: String,
+        default: null
+    },
+    fileUrl: {
+        type: String,
+        default: null
+    },
+    fileName: {
+        type: String,
+        default: null
+    },
+    fileType: {
+        type: String,
+        default: null
+    },
+    fileSize: {
+        type: Number,
         default: null
     }
 },{timestamps:true})

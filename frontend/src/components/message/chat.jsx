@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiSmile, FiImage, FiX } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiSmile, FiImage, FiX, FiFile } from 'react-icons/fi';
 import { format } from 'date-fns';
 import './chat.css';
 import ProfileCard from '../profile/profilecard/card';
@@ -19,6 +19,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
@@ -34,141 +35,236 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   useEffect(() => {
     if (chatId) {
       console.log('Joining chat:', chatId);
-      socket.emit('joinchat', { chatId }); // ✅ Wrap in object
+      socket.emit('joinchat', { chatId }); // Wrap in object
     }
   }, [chatId]);
 
   // Handle file selection
-  const handleFileSelect = (e) => {
+  const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-    
-    // Check file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Only JPG, PNG, GIF, and WebP images are allowed');
-      return;
+    if (file) {
+      // Check file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Only JPG, PNG, GIF, and WebP images are allowed');
+        return;
+      }
+      // Check file size (5MB limit for images)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size should be less than 5MB');
+        return;
+      }
+      setSelectedImage(file);
+      setSelectedFile(null); // Clear file if image is selected
     }
-    
-    // Check file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB');
-      return;
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size should be less than 10MB');
+        return;
+      }
+      setSelectedFile(file);
+      setSelectedImage(null); // Clear image if file is selected
     }
-    
-    setSelectedImage(file);
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
   };
 
   // Remove selected image
-  const removeImage = () => {
+  const removeSelectedImage = () => {
     setSelectedImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
-  // Upload image to backend using FormData
-  const uploadImage = async (file) => {
-    const formData = new FormData();
-    formData.append('image', file);
+  // Format file size
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Get file icon based on file type
+  const getFileIcon = (fileType) => {
+    if (!fileType) return '📄';
     
+    if (fileType.includes('pdf')) return '📄';
+    if (fileType.includes('word') || fileType.includes('document')) return '📝';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '📊';
+    if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '📑';
+    if (fileType.includes('zip') || fileType.includes('compressed')) return '🗜️';
+    if (fileType.includes('text/plain')) return '📄';
+    if (fileType.includes('image/')) return '🖼️';
+    
+    return '📎';
+  };
+
+  const handleFileUpload = async (file, isImage = false) => {
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/message/upload-image`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          withCredentials: true
-        }
-      );
-      return response.data.url;
+      const formData = new FormData();
+      const endpoint = isImage ? 'upload-image' : 'upload-file';
+      formData.append(isImage ? 'image' : 'file', file);
+
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/message/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || `Failed to upload ${isImage ? 'image' : 'file'}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error(`Error uploading ${isImage ? 'image' : 'file'}:`, error);
       throw error;
     }
   };
 
-  // Send message
-  const sendMessage = async () => {
-    if ((!message.trim() && !selectedImage) || isUploading) return;
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if ((!message.trim() && !selectedImage && !selectedFile) || isUploading) return;
 
-    setIsUploading(true);
-    let imageUrl = null;
-    
     try {
+      setIsUploading(true);
+      let imageUrl = null;
+      let fileData = null;
+
       // Upload image if selected
       if (selectedImage) {
-        try {
-          imageUrl = await uploadImage(selectedImage);
-        } catch (error) {
-          console.error('Failed to upload image:', error);
-          alert('Failed to upload image. Please try again.');
-          return;
-        }
+        const data = await handleFileUpload(selectedImage, true);
+        imageUrl = data.url;
       }
 
-      // Send message with or without image
-      const messageData = { 
-        chatId, 
-        message: message.trim(), 
-        senderId: user._id, 
-        receiverId: receiver
-      };
-
-      // Only add imageUrl if it exists
-      if (imageUrl) {
-        messageData.imageUrl = imageUrl;
+      // Upload file if selected
+      if (selectedFile) {
+        const data = await handleFileUpload(selectedFile, false);
+        fileData = {
+          fileUrl: data.url,
+          fileName: data.fileName,
+          fileType: data.fileType,
+          fileSize: data.fileSize
+        };
       }
 
-      // Send the message through the socket
-      socket.emit('message', messageData);
-      
-      
-      
-      // Reset states
+      // Emit the message
+      socket.emit('message', {
+        chatId: chatId,
+        message: message.trim(),
+        senderId: user._id,
+        receiverId: receiver,
+        imageUrl: imageUrl,
+        ...(fileData && fileData)
+      });
+
+      // Clear the input and selected files
       setMessage('');
       setSelectedImage(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setSelectedFile(null);
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      alert(error.message || 'Failed to send message');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Listen for incoming messages
-  // Load existing messages
+  // Load existing messages when chatId changes
   useEffect(() => {
-    if (chatId) {
-      socket.emit('joinchat', { chatId });
-    }
-
-    socket.on('loadMessages', (msgs) => {
-      setChat(msgs);
-    });
-
+    if (!chatId) return;
+    
+    // Join the chat room
+    socket.emit('joinchat', { chatId });
+    
+    // Fetch initial messages
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/message/${chatId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const data = await response.json();
+        
+        // Ensure all messages have required fields
+        const formattedMessages = (data.messages || []).map(msg => ({
+          ...msg,
+          fileUrl: msg.fileUrl || null,
+          fileName: msg.fileName || null,
+          fileType: msg.fileType || null,
+          fileSize: msg.fileSize || null,
+          imageUrl: msg.imageUrl || null,
+          createdAt: msg.createdAt || new Date().toISOString(),
+          senderId: msg.senderId || null,
+          receiverId: msg.receiverId || null
+        }));
+        
+        setChat(formattedMessages);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      }
+    };
+    
+    fetchMessages();
+    
+    // Handle incoming messages from socket
+    const handleLoadMessages = (msgs) => {
+      const formattedMessages = Array.isArray(msgs) ? msgs.map(msg => ({
+        ...msg,
+        fileUrl: msg.fileUrl || null,
+        fileName: msg.fileName || null,
+        fileType: msg.fileType || null,
+        fileSize: msg.fileSize || null,
+        imageUrl: msg.imageUrl || null,
+        createdAt: msg.createdAt || new Date().toISOString(),
+        senderId: msg.senderId || null,
+        receiverId: msg.receiverId || null
+      })) : [];
+      
+      setChat(formattedMessages);
+    };
+    
+    socket.on('loadMessages', handleLoadMessages);
+    
     return () => {
-      socket.off('loadMessages');
+      socket.off('loadMessages', handleLoadMessages);
     };
   }, [chatId]);
 
   // Listen for new messages
   useEffect(() => {
-    socket.on('message', (msg) => {
-      setChat((prev) => [...prev, msg]);
-    });
+    const handleNewMessage = (msg) => {
+      // Ensure the message has all required fields
+      const formattedMsg = {
+        ...msg,
+        fileUrl: msg.fileUrl || null,
+        fileName: msg.fileName || null,
+        fileType: msg.fileType || null,
+        fileSize: msg.fileSize || null,
+        imageUrl: msg.imageUrl || null,
+        createdAt: msg.createdAt || new Date().toISOString(),
+        senderId: msg.senderId || null,
+        receiverId: msg.receiverId || null
+      };
+      
+      setChat((prev) => [...prev, formattedMsg]);
+    };
 
+    socket.on('message', handleNewMessage);
     return () => {
-      socket.off('message');
+      socket.off('message', handleNewMessage);
     };
   }, []);
-
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -182,7 +278,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSendMessage(e);
     }
   };
 
@@ -196,8 +292,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       {currentReceiverDetails && (
         <div className="chat-header">
           {onBack && (
-            <button 
-              onClick={onBack} 
+            <button
+              onClick={onBack}
               className="back-button"
               aria-label="Back to contacts"
             >
@@ -210,18 +306,18 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             </div>
             <div className='userdetails'>
               <div>
-              <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
-              <div className="user-status">Online</div> 
+                <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
+                <div className="user-status">Online</div>
               </div>
               <button onClick={() => setviewcard(!view)} className='view-profile-btn'>
                 {view ? (
                   <>
-                    <FaUser/>
+                    <FaUser />
                     <p>Hover over card</p>
                   </>
                 ) : (
                   <>
-                    <FaUser/>
+                    <FaUser />
                     <p>View Profile Card</p>
                   </>
                 )}
@@ -246,9 +342,9 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
                 {msg.imageUrl && (
                   <div className="message-image">
-                    <img 
-                      src={msg.imageUrl} 
-                      alt="Shared content" 
+                    <img
+                      src={msg.imageUrl}
+                      alt="Shared content"
                       className="chat-image"
                       onClick={() => window.open(msg.imageUrl, '_blank')}
                       onLoad={(e) => {
@@ -268,7 +364,24 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                     )}
                   </div>
                 )}
-                {!msg.imageUrl && msg.message && <p>{msg.message}</p>}
+                {msg.fileUrl && (
+                  <div 
+                    className="message-file"
+                    onClick={() => window.open(msg.fileUrl, '_blank')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="file-icon">
+                      {getFileIcon(msg.fileType)}
+                    </div>
+                    <div className="file-info">
+                      <div className="file-name">{msg.fileName || 'Download file'}</div>
+                      {msg.fileSize && (
+                        <div className="file-size">{formatFileSize(msg.fileSize)}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {!msg.imageUrl && !msg.fileUrl && msg.message && <p>{msg.message}</p>}
                 <span className="message-time">
                   {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
                 </span>
@@ -291,15 +404,41 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       </div>
 
       {/* Image preview */}
-      {selectedImage && (
-        <div className="image-preview-container">
-          <div className="image-preview">
-            <img 
-              src={URL.createObjectURL(selectedImage)} 
-              alt="Preview" 
-              className="preview-image"
-            />
-            <button className="remove-image-btn" onClick={removeImage}>
+      {(selectedImage || selectedFile) && (
+        <div className="file-preview-container">
+          <div className="file-preview">
+            {selectedImage ? (
+              <>
+                <img
+                  src={URL.createObjectURL(selectedImage)}
+                  alt="Preview"
+                  className="preview-file"
+                />
+                <div className="file-info">
+                  <div className="file-name">{selectedImage.name}</div>
+                  <div className="file-size">
+                    {formatFileSize(selectedImage.size)}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="file-icon">
+                  {getFileIcon(selectedFile.type)}
+                </div>
+                <div className="file-info">
+                  <div className="file-name">{selectedFile.name}</div>
+                  <div className="file-size">
+                    {formatFileSize(selectedFile.size)}
+                  </div>
+                </div>
+              </>
+            )}
+            <button
+              onClick={selectedImage ? removeSelectedImage : removeSelectedFile}
+              className="remove-file-btn"
+              title={selectedImage ? 'Remove image' : 'Remove file'}
+            >
               <FiX size={16} />
             </button>
           </div>
@@ -310,18 +449,27 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         <div className="file-input-wrapper">
           <input
             type="file"
-            ref={fileInputRef}
+            id="image-upload"
             accept="image/*"
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
+            onChange={handleImageChange}
+            className="file-input"
+            disabled={isUploading || selectedFile}
           />
-          <button 
-            className="attachment-btn" 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-          >
+          <label htmlFor="image-upload" className="attachment-btn" title="Send image">
             <FiImage size={20} />
-          </button>
+          </label>
+        </div>
+        <div className="file-input-wrapper">
+          <input
+            type="file"
+            id="file-upload"
+            onChange={handleFileChange}
+            className="file-input"
+            disabled={isUploading || selectedImage}
+          />
+          <label htmlFor="file-upload" className="attachment-btn" title="Send file">
+            <FiFile size={20} />
+          </label>
         </div>
         <div className="input-wrapper">
           <input
@@ -330,7 +478,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={selectedImage ? 'Add a caption...' : 'Type a message...'}
+            placeholder={selectedImage || selectedFile ? 'Add a caption...' : 'Type a message...'}
             className="chat-input"
             disabled={isUploading}
           />
@@ -339,9 +487,9 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </button>
         </div>
         <button
-          onClick={sendMessage}
+          onClick={handleSendMessage}
           className="send-btn"
-          disabled={(!message.trim() && !selectedImage) || isUploading}
+          disabled={(!message.trim() && !selectedImage && !selectedFile) || isUploading}
         >
           {isUploading ? (
             <div className="spinner"></div>

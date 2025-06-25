@@ -103,9 +103,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl }) => {
+  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl, fileUrl, fileName, fileType, fileSize }) => {
     try {
-      console.log('New message:', { chatId, senderId, receiverId, message, imageUrl });
+      console.log('New message:', { chatId, senderId, receiverId, message, imageUrl, fileUrl, fileName, fileType, fileSize });
       
       // Create and save the message
       const newMessage = new messageModel({
@@ -115,7 +115,11 @@ io.on('connection', (socket) => {
         senderId,
         receiverId,
         isRead: false,
-        imageUrl: imageUrl || null
+        imageUrl: imageUrl || null,
+        fileUrl: fileUrl || null,
+        fileName: fileName || null,
+        fileType: fileType || null,
+        fileSize: fileSize || null
       });
       
       const savedMessage = await newMessage.save();
@@ -133,6 +137,10 @@ io.on('connection', (socket) => {
         receiverId: messageObj.receiverId,
         isRead: messageObj.isRead,
         imageUrl: messageObj.imageUrl || null,
+        fileUrl: messageObj.fileUrl || null,
+        fileName: messageObj.fileName || null,
+        fileType: messageObj.fileType || null,
+        fileSize: messageObj.fileSize || null,
         createdAt: messageObj.createdAt
       });
       
