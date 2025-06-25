@@ -181,7 +181,8 @@ router.put("/picture", verifyToken, upload.single('profilePicture'), async (req,
 router.get("/friends",verifyToken,async (req,res)=>{
   try {
     const user = req.user;
-    const friends = await User.find({ _id: { $in: user.friends } }).select("_id username profilePicture")
+    const friends = await User.find({ _id: { $in: user.friends } }).select("-password")
+    // console.log(friends)
     res.status(200).json({ friends: friends });
   } catch (error) {
     res.status(500).json({ message: error.message });

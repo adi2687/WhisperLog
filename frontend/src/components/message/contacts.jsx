@@ -23,6 +23,7 @@ export default function Contacts() {
         .then(res => res.json())
         .then(data => {
             if (data.friends) {
+                console.log('freidn s aya',data.friends)
                 setFriends(data.friends);
             }
         })
@@ -36,7 +37,7 @@ export default function Contacts() {
     const filteredFriends = friends.filter(friend => 
         friend.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    const findchatid=(receiverId)=>{
+    const findchatid=(receiverId,receiver)=>{
         fetch(`${backendUrl}/message/findid`,{
             method:'POST',
             headers:{
@@ -47,8 +48,9 @@ export default function Contacts() {
         }   )
         .then(res=>res.json())
         .then(data=>{
+            console.log(data,receiver)
             if (data.chatId){
-                navigate(`/chat/${data.chatId}`, { state: { receiver: receiverId } });
+                navigate(`/chat/${data.chatId}`, { state: { receiver: receiverId,receiverUsername:receiver } });
             }
         })
         .catch(error=>console.error('Error fetching chat id:',error))
@@ -96,7 +98,7 @@ export default function Contacts() {
                         <div 
                             key={friend._id} 
                             className={`contact-item ${activeChatId === friend._id ? 'active' : ''}`}
-                            onClick={()=>findchatid(friend._id)}
+                            onClick={()=>findchatid(friend._id,friend)}
                         >
                             <img
                                 src={friend.profilePicture || '/default-avatar.svg'}
@@ -110,7 +112,7 @@ export default function Contacts() {
                             <div className="contact-info">
                                 <div className="contact-header">
                                     <span className="contact-username">{friend.username}</span>
-                                    <span className="contact-time">12:30 PM</span>
+                                    {/* <span className="contact-time">12:30 PM</span> */}
                                 </div>
                                 <div className="contact-status">
                                     <span className={`status-indicator ${friend.isOnline ? 'online' : ''}`}></span>

@@ -1,20 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import './chat.css'
+import { FiSend, FiPaperclip, FiSmile, FiImage, FiX } from 'react-icons/fi';
+import { format } from 'date-fns';
+import './chat.css';
+import ProfileCard from '../profile/profilecard/card';
+import { FaUser } from 'react-icons/fa';
+import axios from 'axios';
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
 export default function Chat({ chatId }) {
   const location = useLocation();
   const [receiver, setReceiver] = useState(location.state?.receiver);
+  const [receiverdetails, setReceiverdetails] = useState(location.state?.receiverUsername);
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
-
+  const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
   // Update receiver if location changes
   useEffect(() => {
     setReceiver(location.state?.receiver);
+    setReceiverdetails(location.state?.receiverUsername);
   }, [location.state?.receiver]);
 
   // Join the chat room
@@ -25,71 +37,257 @@ export default function Chat({ chatId }) {
     }
   }, [chatId]);
 
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Image size should be less than 5MB');
+        return;
+      }
+      setSelectedImage(file);
+    }
+  };
+
+  // Remove selected image
+  const removeImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Upload image to Cloudinary
+  const uploadImage = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'whisperlog_chat');
+    
+    try {
+      const response = await axios.post(
+        'https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/upload',
+        formData
+      );
+      return response.data.secure_url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
+
   // Send message
-  const sendMessage = () => {
-    // console.log(chatId,user._id,receiver._id,message)
-    if (message.trim()) {
-      socket.emit('message', { chatId, message,senderId:user._id,receiverId:receiver });
+  const sendMessage = async () => {
+    if ((!message.trim() && !selectedImage) || isUploading) return;
+
+    setIsUploading(true);
+    let imageUrl = null;
+    
+    try {
+      // Upload image if selected
+      if (selectedImage) {
+        imageUrl = await uploadImage(selectedImage);
+      }
+
+      // Send message with or without image
+      socket.emit('message', { 
+        chatId, 
+        message: message.trim(), 
+        senderId: user._id, 
+        receiverId: receiver,
+        imageUrl
+      });
+      
+      // Reset states
       setMessage('');
+      setSelectedImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setIsUploading(false);
     }
   };
 
   // Listen for incoming messages
-// Load existing messages
-useEffect(() => {
-  if (chatId) {
-    socket.emit('joinchat', { chatId });
-  }
+  // Load existing messages
+  useEffect(() => {
+    if (chatId) {
+      socket.emit('joinchat', { chatId });
+    }
 
-  socket.on('loadMessages', (msgs) => {
-    setChat(msgs);
-  });
+    socket.on('loadMessages', (msgs) => {
+      setChat(msgs);
+    });
 
-  return () => {
-    socket.off('loadMessages');
+    return () => {
+      socket.off('loadMessages');
+    };
+  }, [chatId]);
+
+  // Listen for new messages
+  useEffect(() => {
+    socket.on('message', (msg) => {
+      setChat((prev) => [...prev, msg]);
+    });
+
+    return () => {
+      socket.off('message');
+    };
+  }, []);
+
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [chat]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-}, [chatId]);
 
-// Listen for new messages
-useEffect(() => {
-  socket.on('message', (msg) => {
-    setChat((prev) => [...prev, msg]);
-  });
-
-  return () => {
-    socket.off('message');
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
-}, []);
 
+  const [view, setviewcard] = useState(false)
 
+  useEffect(() => {
+    setviewcard(false)
+  }, [chatId])
   return (
     <div className="chat-container">
-      <h1 className="chat-title">Chat App</h1>
+      {receiverdetails && (
+        <div className="chat-header">
+          <div className="user-info">
+            <div className="avatar">
+              <img src={receiverdetails.profilePicture || '/default-avatar.svg'} alt="" />
+            </div>
+            <div className='userdetails'>
+              <div>
+              <div className="user-name">{receiverdetails.username || 'Unknown User'}</div>
+              {/* <div className='bio'>{receiverdetails?.bio || 'No bio'}</div> */}
+              <div className="user-status">Online</div> 
+              </div>
+              <button onClick={() => setviewcard(!view)} className='view-profile-btn'>
+                {view ? (
+                  <>
+                  <FaUser/>
+                  <p>Hover over card</p>
+                  </>
+                ) : (
+                  <>
+                  <FaUser/>
+                  <p>View Profile Card</p>
+                  </>
+                )}
+                </button>
+              <div className="profile-card-main">
+                {view ? 
+                <div> 
+                (<ProfileCard receiverdetails={receiverdetails} setviewcard={setviewcard} />)
+                </div>
+                : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="chat-box">
         {chat.length > 0 ? (
           chat.map((msg, index) => (
-            <div key={index} className="chat-message">
-              <p>{msg.message}</p>
+            <div
+              key={index}
+              className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'
+                }`}
+            >
+              <div className="message-content">
+                <p>{msg.message}</p>
+                <span className="message-time">
+                  {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
+                </span>
+              </div>
             </div>
           ))
         ) : (
-          <p className="no-messages">No messages</p>
+          <div className="no-messages">
+            <p>Start a conversation with {receiver?.name || 'this user'}</p>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+        {isTyping && (
+          <div className="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
         )}
       </div>
 
-      <div className="chat-input-area">
-      <input
-  type="text"
-  value={message}
-  onChange={(e) => setMessage(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === 'Enter') sendMessage();
-  }}
-  placeholder="Type a message"
-  className="chat-input"
-/>
-        <button onClick={sendMessage} className="chat-send-btn">Send</button>
+      {/* Image preview */}
+      {selectedImage && (
+        <div className="image-preview-container">
+          <div className="image-preview">
+            <img 
+              src={URL.createObjectURL(selectedImage)} 
+              alt="Preview" 
+              className="preview-image"
+            />
+            <button className="remove-image-btn" onClick={removeImage}>
+              <FiX size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="chat-input-container">
+        <div className="file-input-wrapper">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
+          <button 
+            className="attachment-btn" 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            <FiImage size={20} />
+          </button>
+        </div>
+        <div className="input-wrapper">
+          <input
+            ref={inputRef}
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={selectedImage ? 'Add a caption...' : 'Type a message...'}
+            className="chat-input"
+            disabled={isUploading}
+          />
+          <button className="emoji-btn" disabled={isUploading}>
+            <FiSmile size={20} />
+          </button>
+        </div>
+        <button
+          onClick={sendMessage}
+          className="send-btn"
+          disabled={(!message.trim() && !selectedImage) || isUploading}
+        >
+          {isUploading ? (
+            <div className="spinner"></div>
+          ) : (
+            <FiSend size={20} />
+          )}
+        </button>
       </div>
     </div>
   );
