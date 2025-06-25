@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiSmile, FiImage, FiX, FiFile } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiSmile, FiImage, FiX, FiFile, FiGift, FiVideo } from 'react-icons/fi';
 import { format } from 'date-fns';
 import './chat.css';
+import './GifPicker.css';
 import ProfileCard from '../profile/profilecard/card';
 import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
@@ -20,7 +21,12 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedGif, setSelectedGif] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifs, setGifs] = useState([]);
   const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
   const inputRef = useRef(null);
@@ -59,6 +65,43 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   };
 
+  const handleVideoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file size (50MB limit)
+      const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+      if (file.size > maxSize) {
+        alert('Video file is too large. Maximum size is 50MB.');
+        return;
+      }
+      
+      // Check file type
+      const validTypes = [
+        'video/mp4', 'video/webm', 'video/quicktime', 
+        'video/x-msvideo', 'video/x-ms-wmv', 'video/3gpp', 
+        'video/3gpp2', 'video/mpeg', 'video/mp2t', 'video/x-flv',
+        'video/x-m4v', 'video/x-matroska', 'video/x-ms-asf'
+      ];
+      
+      const fileType = file.type.toLowerCase();
+      const isValidType = validTypes.some(type => fileType.includes(type.replace('video/', '')));
+      
+      if (!isValidType) {
+        alert('Unsupported video format. Supported formats: MP4, WebM, QuickTime, AVI, WMV, 3GPP, MPEG, FLV, MKV, etc.');
+        return;
+      }
+      
+      setSelectedVideo(file);
+      setSelectedImage(null);
+      setSelectedFile(null);
+      setSelectedGif(null);
+      setMessage('');
+      
+      // Reset the file input to allow selecting the same file again
+      e.target.value = null;
+    }
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -68,7 +111,9 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         return;
       }
       setSelectedFile(file);
-      setSelectedImage(null); // Clear image if file is selected
+      setSelectedImage(null);
+      setSelectedVideo(null);
+      setSelectedGif(null);
     }
   };
 
@@ -76,9 +121,14 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     setSelectedFile(null);
   };
 
+  const removeSelectedVideo = () => {
+    setSelectedVideo(null);
+  };
+
   // Remove selected image
   const removeSelectedImage = () => {
     setSelectedImage(null);
+    setSelectedGif(null);
   };
 
   // Format file size
@@ -105,55 +155,190 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     return '📎';
   };
 
-  const handleFileUpload = async (file, isImage = false) => {
+  const handleFileUpload = async (file, type = 'file') => {
     try {
-      const formData = new FormData();
-      const endpoint = isImage ? 'upload-image' : 'upload-file';
-      formData.append(isImage ? 'image' : 'file', file);
-
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/message/${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Failed to upload ${isImage ? 'image' : 'file'}`);
+      const uploadFormData = new FormData();
+      let endpoint = 'upload-file';
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'; // Fallback URL
+      
+      // Add file to form data based on type
+      if (type === 'image') {
+        if (typeof file === 'string') {
+          return { imageUrl: file }; // Return GIF URL directly
+        }
+        endpoint = 'upload-image';
+        uploadFormData.append('image', file);
+      } else if (type === 'video') {
+        endpoint = 'upload-video';
+        uploadFormData.append('video', file);
+        uploadFormData.append('fileName', file.name);
+        uploadFormData.append('fileType', file.type);
+        uploadFormData.append('fileSize', file.size);
+      } else {
+        uploadFormData.append('file', file);
       }
 
-      return await response.json();
+      const url = `${backendUrl}/message/${endpoint}`;
+      console.log(`Uploading ${type} to:`, url);
+      console.log('Request headers:', {
+        'Authorization': `Bearer ${localStorage.getItem('token') ? '***' : 'No token found'}`,
+        'Content-Type': 'multipart/form-data'
+      });
+      console.log('File details:', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified
+      });
+
+      // Make the request with error handling
+      let response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            // Don't set Content-Type, let the browser set it with the boundary
+          },
+          body: uploadFormData
+        });
+      } catch (networkError) {
+        console.error('Network error during upload:', networkError);
+        throw new Error(`Network error: ${networkError.message}. Please check your connection.`);
+      }
+
+      // Get response as text first
+      const responseText = await response.text();
+      console.log(`[${response.status}] Response:`, responseText);
+      
+      // Try to parse as JSON
+      let responseData;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : {};
+      } catch (e) {
+        console.error('Failed to parse JSON response. Response was:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: responseText
+        });
+        
+        if (responseText.trim().startsWith('<!DOCTYPE')) {
+          throw new Error('Server returned an HTML error page. The server might be misconfigured.');
+        }
+        
+        throw new Error(`Invalid server response (${response.status} ${response.statusText}). Please try again.`);
+      }
+
+      // Handle non-OK responses
+      if (!response.ok) {
+        const errorMessage = responseData.message || 
+                          responseData.error || 
+                          `Server returned ${response.status} ${response.statusText}`;
+        
+        console.error('Upload failed:', {
+          status: response.status,
+          error: errorMessage,
+          response: responseData
+        });
+        
+        throw new Error(errorMessage);
+      }
+
+      console.log('Upload successful:', responseData);
+      return responseData;
+      
     } catch (error) {
-      console.error(`Error uploading ${isImage ? 'image' : 'file'}:`, error);
+      console.error(`Error in handleFileUpload (${type}):`, error);
+      if (!error.message) {
+        error.message = `An unknown error occurred while uploading ${type}`;
+      }
       throw error;
+    }
+  };
+
+  // Search for GIFs
+  const searchGifs = async (query) => {
+    try {
+      // Using GIPHY API - you'll need to get an API key from https://developers.giphy.com/
+      const apiKey = 'cDZR4AxCLnQKYGF2qS9K90FMDTPee2sc'; // Replace with your GIPHY API key
+      const response = await fetch(
+        `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=10`
+      );
+      const data = await response.json();
+      setGifs(data.data || []);
+    } catch (error) {
+      console.error('Error searching GIFs:', error);
+    }
+  };
+
+  // Select a GIF to send
+  const handleGifSelect = (gif) => {
+    setSelectedGif(gif.images.original.url);
+    setSelectedImage(null);
+    setSelectedFile(null);
+    setShowGifPicker(false);
+    
+    // Auto-focus the message input after selecting a GIF
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if ((!message.trim() && !selectedImage && !selectedFile) || isUploading) return;
+    if ((!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading) return;
 
     try {
       setIsUploading(true);
-      let imageUrl = null;
+      let imageUrl = selectedGif || null;
       let fileData = null;
 
-      // Upload image if selected
+      // Handle media uploads
       if (selectedImage) {
-        const data = await handleFileUpload(selectedImage, true);
-        imageUrl = data.url;
+        const result = await handleFileUpload(selectedImage, 'image');
+        imageUrl = result.imageUrl || result.url;
+      } 
+      // Handle video upload if exists
+      else if (selectedVideo) {
+        try {
+          const result = await handleFileUpload(selectedVideo, 'video');
+          console.log('Video upload result:', result);
+          
+          // Handle Cloudinary response format
+          const videoUrl = result.secure_url || result.url;
+          const thumbnailUrl = result.thumbnail || 
+                            (result.eager && result.eager[0]?.url) ||
+                            (result.secure_url && result.secure_url.replace(/\.(mp4|webm|mov|avi|wmv|flv|mkv|3gp|mpeg|mpg|m4v|ogv)$/i, '.jpg'));
+          
+          fileData = { 
+            fileUrl: videoUrl, 
+            fileName: result.originalname || selectedVideo.name, 
+            fileType: result.resource_type === 'video' ? 'video' : (result.format ? `video/${result.format}` : 'video/mp4'),
+            thumbnail: thumbnailUrl,
+            duration: result.duration,
+            width: result.width,
+            height: result.height,
+            public_id: result.public_id,
+            format: result.format,
+            resource_type: result.resource_type,
+            eager: result.eager
+          };
+          
+          console.log('Processed video data:', fileData);
+        } catch (error) {
+          console.error('Error processing video upload:', error);
+          throw new Error(`Failed to process video: ${error.message}`);
+        }
       }
-
-      // Upload file if selected
-      if (selectedFile) {
-        const data = await handleFileUpload(selectedFile, false);
+      // Handle file upload if exists
+      else if (selectedFile) {
+        const result = await handleFileUpload(selectedFile, 'file');
         fileData = {
-          fileUrl: data.url,
-          fileName: data.fileName,
-          fileType: data.fileType,
-          fileSize: data.fileSize
+          fileUrl: result.url || result.secure_url,
+          fileName: selectedFile.name,
+          fileType: selectedFile.type,
+          fileSize: selectedFile.size
         };
       }
 
@@ -167,10 +352,11 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         ...(fileData && fileData)
       });
 
-      // Clear the input and selected files
+      // Clear the input and selected files/GIF
       setMessage('');
       setSelectedImage(null);
       setSelectedFile(null);
+      setSelectedGif(null);
     } catch (error) {
       console.error('Error sending message:', error);
       alert(error.message || 'Failed to send message');
@@ -287,6 +473,83 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   useEffect(() => {
     setviewcard(false)
   }, [chatId])
+
+  // Render message content based on type
+  const renderMessageContent = (msg) => {
+    if (msg.imageUrl) {
+      return (
+        <div className="message-image">
+          <img 
+            src={msg.imageUrl} 
+            alt="Shared content" 
+            className="chat-image" 
+            onClick={() => window.open(msg.imageUrl, '_blank')}
+          />
+          {msg.message && <div className="image-caption">{msg.message}</div>}
+        </div>
+      );
+    } else if (msg.fileUrl) {
+      // Check if it's a video
+      if ((msg.fileType && (msg.fileType.startsWith('video/') || msg.fileType === 'video')) || 
+          (msg.fileUrl && msg.fileUrl.match(/\.(mp4|webm|mov|avi|wmv|flv|mkv|3gp|mpeg|mpg|m4v|ogv)($|\?)/i))) {
+        
+        // Ensure the URL is properly formatted
+        const videoUrl = msg.fileUrl?.startsWith('http') ? msg.fileUrl : 
+                         msg.fileUrl?.startsWith('//') ? `https:${msg.fileUrl}` : 
+                         msg.fileUrl;
+        
+        // Get thumbnail if available
+        const thumbnailUrl = msg.thumbnail || 
+                           (msg.eager && msg.eager[0]?.url) || 
+                           (msg.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${msg.public_id}.jpg`);
+        
+        return (
+          <div className="message-video">
+            <video 
+              className="chat-video"
+              controls
+              controlsList="nodownload"
+              poster={thumbnailUrl}
+              preload="metadata"
+              style={{ maxWidth: '100%', maxHeight: '400px' }}
+              onError={(e) => {
+                console.error('Error loading video:', e);
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'video-error';
+                errorMsg.textContent = 'Error loading video. Click to open in new tab.';
+                e.target.parentNode.appendChild(errorMsg);
+                
+                // Make the video container clickable to open the video in a new tab
+                e.target.parentNode.style.cursor = 'pointer';
+                e.target.parentNode.onclick = () => window.open(videoUrl, '_blank');
+              }}
+            >
+              <source src={videoUrl} type={msg.fileType || 'video/mp4'} />
+              Your browser does not support the video tag.
+            </video>
+            {msg.message && <div className="video-caption">{msg.message}</div>}
+          </div>
+        );
+      }
+      
+      // Regular file download
+      return (
+        <div className="message-file" onClick={() => window.open(msg.fileUrl, '_blank')}>
+          <div className="file-icon">{getFileIcon(msg.fileName || 'file')}</div>
+          <div className="file-info">
+            <div className="file-name" title={msg.fileName}>
+              {msg.fileName || 'Download file'}
+            </div>
+            <div className="file-size">
+              {msg.fileSize ? formatFileSize(msg.fileSize) : 'Click to view'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return msg.message ? <p>{msg.message}</p> : null;
+  };
+
   return (
     <div className="chat-container">
       {currentReceiverDetails && (
@@ -340,48 +603,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
             >
               <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
-                {msg.imageUrl && (
-                  <div className="message-image">
-                    <img
-                      src={msg.imageUrl}
-                      alt="Shared content"
-                      className="chat-image"
-                      onClick={() => window.open(msg.imageUrl, '_blank')}
-                      onLoad={(e) => {
-                        // Add loaded class when image is loaded
-                        e.target.classList.add('image-loaded');
-                      }}
-                      onError={(e) => {
-                        // Handle image loading errors
-                        e.target.src = '/image-error.png';
-                        e.target.classList.add('image-error');
-                      }}
-                    />
-                    {msg.message && (
-                      <div className="image-caption">
-                        {msg.message}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {msg.fileUrl && (
-                  <div 
-                    className="message-file"
-                    onClick={() => window.open(msg.fileUrl, '_blank')}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="file-icon">
-                      {getFileIcon(msg.fileType)}
-                    </div>
-                    <div className="file-info">
-                      <div className="file-name">{msg.fileName || 'Download file'}</div>
-                      {msg.fileSize && (
-                        <div className="file-size">{formatFileSize(msg.fileSize)}</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {!msg.imageUrl && !msg.fileUrl && msg.message && <p>{msg.message}</p>}
+                {renderMessageContent(msg)}
                 <span className="message-time">
                   {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
                 </span>
@@ -390,7 +612,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           ))
         ) : (
           <div className="no-messages">
-            <p>Start a conversation with {receiver?.name || 'this user'}</p>
+            <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -404,10 +626,36 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       </div>
 
       {/* Image preview */}
-      {(selectedImage || selectedFile) && (
+      {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
         <div className="file-preview-container">
           <div className="file-preview">
-            {selectedImage ? (
+            {selectedGif ? (
+              <>
+                <img
+                  src={selectedGif}
+                  alt="GIF Preview"
+                  className="preview-file"
+                  style={{ maxHeight: '100px' }}
+                />
+                <div className="file-info">
+                  <div className="file-name">GIF</div>
+                </div>
+              </>
+            ) : selectedVideo ? (
+              <div className="video-preview">
+                <video className="preview-video" controls>
+                  <source src={URL.createObjectURL(selectedVideo)} type={selectedVideo.type} />
+                  Your browser does not support the video tag.
+                </video>
+                <button
+                  onClick={removeSelectedVideo}
+                  className="remove-file-btn"
+                  title="Remove video"
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            ) : selectedImage ? (
               <>
                 <img
                   src={URL.createObjectURL(selectedImage)}
@@ -453,10 +701,59 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             accept="image/*"
             onChange={handleImageChange}
             className="file-input"
-            disabled={isUploading || selectedFile}
+            disabled={isUploading || selectedFile || selectedGif}
           />
           <label htmlFor="image-upload" className="attachment-btn" title="Send image">
             <FiImage size={20} />
+          </label>
+        </div>
+        
+        <button 
+          type="button" 
+          className="gif-btn"
+          onClick={() => setShowGifPicker(!showGifPicker)}
+          disabled={isUploading || selectedFile || selectedImage}
+          title="Send GIF"
+        >
+          <FiGift size={20} />
+        </button>
+        
+        {showGifPicker && (
+          <div className="gif-picker">
+            <input
+              type="text"
+              placeholder="Search GIFs..."
+              value={gifQuery}
+              onChange={(e) => {
+                setGifQuery(e.target.value);
+                searchGifs(e.target.value);
+              }}
+              className="gif-search"
+            />
+            <div className="gif-grid">
+              {gifs.map((gif) => (
+                <img
+                  key={gif.id}
+                  src={gif.images.fixed_height_small.url}
+                  alt={gif.title}
+                  className="gif-item"
+                  onClick={() => handleGifSelect(gif)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="file-input-wrapper">
+          <input
+            type="file"
+            id="video-upload"
+            accept="video/*"
+            onChange={handleVideoChange}
+            className="file-input"
+            disabled={isUploading || selectedImage || selectedFile || selectedGif}
+          />
+          <label htmlFor="video-upload" className="attachment-btn" title="Send video">
+            <FiVideo size={20} />
           </label>
         </div>
         <div className="file-input-wrapper">
@@ -465,7 +762,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             id="file-upload"
             onChange={handleFileChange}
             className="file-input"
-            disabled={isUploading || selectedImage}
+            disabled={isUploading || selectedImage || selectedVideo || selectedGif}
           />
           <label htmlFor="file-upload" className="attachment-btn" title="Send file">
             <FiFile size={20} />
@@ -489,7 +786,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         <button
           onClick={handleSendMessage}
           className="send-btn"
-          disabled={(!message.trim() && !selectedImage && !selectedFile) || isUploading}
+          disabled={(!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading}
         >
           {isUploading ? (
             <div className="spinner"></div>

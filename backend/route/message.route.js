@@ -1,4 +1,5 @@
 import express from 'express'
+import path from 'path'
 import MessageModel from '../models/message.model.js'
 import ChatModel from '../models/chat.model.js'
 const router = express.Router()
@@ -39,11 +40,28 @@ const chatFileStorage = new CloudinaryStorage({
   params: {
     folder: 'whisperlog/chat-files',
     resource_type: 'auto',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip'],
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'mp4', 'webm', 'mov', 'avi', 'wmv', 'flv', 'mkv'],
     transformation: [
       { width: 1000, height: 1000, crop: 'limit', quality: 'auto' },
       { fetch_format: 'auto' }
     ]
+  },
+});
+
+// Configure Cloudinary storage specifically for videos
+const videoStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'whisperlog/chat-videos',
+    resource_type: 'video',
+    allowed_formats: ['mp4', 'webm', 'mov', 'avi', 'wmv', 'flv', 'mkv', '3gp', 'mpeg', 'mpg', 'm4v', 'ogv'],
+    chunk_size: 6000000, // 6MB chunks for large files
+    eager: [
+      { width: 300, height: 300, crop: "pad", audio_codec: "none" }, 
+      { width: 160, height: 100, crop: "crop", gravity: "south", audio_codec: "none" } 
+    ],
+    eager_async: true,
+    eager_notification_url: "http://your-site.com/notify_endpoint"
   },
 });
 
@@ -66,7 +84,14 @@ const uploadFile = multer({
   storage: chatFileStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for other files
   fileFilter: (req, file, cb) => {
+    console.log('Processing file upload:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+
     const allowedTypes = [
+      // Documents
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -75,17 +100,140 @@ const uploadFile = multer({
       'application/vnd.ms-powerpoint',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       'text/plain',
+      'text/csv',
+      'application/rtf',
+      'application/json',
+      
+      // Archives
       'application/zip',
       'application/x-zip-compressed',
-      'application/x-rar-compressed'
+      'application/x-rar-compressed',
+      'application/x-7z-compressed',
+      'application/x-tar',
+      'application/x-gzip',
+      
+      // Images (though they should go through upload-image)
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'image/bmp',
+      'image/tiff',
+      
+      // Videos (though they should go through upload-video)
+      'video/mp4',
+      'video/webm',
+      'video/ogg',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-ms-wmv',
+      'video/3gpp',
+      'video/3gpp2',
+      'video/mpeg',
+      'video/x-flv',
+      'video/x-m4v',
+      'video/x-matroska',
+      'video/x-ms-asf',
+      'application/octet-stream' // Fallback for some file types
     ];
     
-    if (allowedTypes.includes(file.mimetype)) {
-      console.log('File type allowed:', file.mimetype);
+    // Get file extension
+    const fileExt = file.originalname.split('.').pop().toLowerCase();
+    const allowedExtensions = [
+      // Documents
+      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf', 'json',
+      // Archives
+      'zip', 'rar', '7z', 'tar', 'gz',
+      // Images
+      'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff',
+      // Videos
+      'mp4', 'webm', 'ogv', 'mov', 'avi', 'wmv', '3gp', '3g2', 'mpeg', 'mpg', 'flv', 'm4v', 'mkv'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(fileExt)) {
+      console.log('File type allowed:', {
+        mimetype: file.mimetype,
+        extension: fileExt,
+        originalname: file.originalname
+      });
       cb(null, true);
     } else {
-      cb(new Error('Unsupported file type'));
+      console.log('Unsupported file type:', {
+        mimetype: file.mimetype,
+        extension: fileExt,
+        originalname: file.originalname,
+        allowedTypes,
+        allowedExtensions
+      });
+      cb(new Error(`Unsupported file type. Allowed types: ${allowedExtensions.join(', ')}`));
     }
+  },
+});
+
+// Configure multer for video uploads
+const uploadVideo = multer({
+  storage: videoStorage,
+  limits: { 
+    fileSize: 50 * 1024 * 1024, // 50MB limit for videos
+    files: 1,
+    fields: 10, // Maximum number of non-file fields
+    parts: 20 // Maximum number of parts (fields + files)
+  },
+  fileFilter: (req, file, cb) => {
+    // Log all available file properties for debugging
+    const fileInfo = {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      encoding: file.encoding,
+      mimetype: file.mimetype,
+      size: file.size,
+      destination: file.destination,
+      filename: file.filename,
+      path: file.path,
+      buffer: file.buffer ? `Buffer(${file.buffer.length} bytes)` : undefined,
+      stream: file.stream ? 'Stream available' : 'No stream',
+      allProperties: Object.getOwnPropertyNames(file)
+    };
+    
+    console.log('Processing file upload:', JSON.stringify(fileInfo, null, 2));
+
+    // Skip size check for now since it's coming in as undefined
+    // We'll handle size validation after the file is fully uploaded
+    
+    // Check file type based on MIME type and extension
+    const allowedTypes = [
+      'video/mp4', 'video/webm', 'video/quicktime',
+      'video/x-msvideo', 'video/x-ms-wmv', 'video/3gpp',
+      'video/3gpp2', 'video/mpeg', 'video/mp2t',
+      'video/x-flv', 'video/x-m4v', 'video/x-matroska',
+      'video/x-ms-asf', 'video/ogg', 'application/octet-stream'
+    ];
+
+    // Get file extension
+    const fileExt = file.originalname ? path.extname(file.originalname).toLowerCase() : '';
+    const allowedExtensions = ['.mp4', '.webm', '.mov', '.avi', '.wmv', '.3gp', '.3g2', '.mpeg', '.mpg', '.m4v', '.mkv', '.flv', '.ogv'];
+
+    // Check MIME type if available
+    if (file.mimetype && !allowedTypes.includes(file.mimetype)) {
+      console.error('Unsupported MIME type:', file.mimetype);
+      return cb(new Error(`Unsupported video format: ${file.mimetype}. Supported formats: MP4, WebM, MOV, AVI, WMV, 3GP, MPEG, MKV, FLV`));
+    }
+
+    // Check file extension if MIME type is not reliable
+    if (fileExt && !allowedExtensions.includes(fileExt)) {
+      console.error('Unsupported file extension:', fileExt);
+      return cb(new Error(`Unsupported file extension: ${fileExt}. Supported extensions: ${allowedExtensions.join(', ')}`));
+    }
+
+    // If we get here, the file is either valid or we can't determine it's invalid
+    console.log('Accepting file for upload:', {
+      name: file.originalname,
+      type: file.mimetype,
+      size: file.size
+    });
+    
+    cb(null, true);
   },
 });
 
@@ -151,6 +299,86 @@ router.post('/upload-file', uploadFile.single('file'), async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
+});
+
+// Endpoint to handle video uploads
+router.post('/upload-video', (req, res, next) => {
+  // First handle the file upload
+  uploadVideo.single('video')(req, res, async (err) => {
+    try {
+      console.log('Video upload request received:', {
+        file: req.file ? {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          path: req.file.path,
+          fieldname: req.file.fieldname,
+          encoding: req.file.encoding,
+          destination: req.file.destination,
+          filename: req.file.filename
+        } : 'No file received',
+        fields: req.body,
+        headers: req.headers,
+        error: err ? err.message : 'No error'
+      });
+
+      // Handle multer errors
+      if (err) {
+        console.error('Multer error:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: 'File size too large. Maximum 50MB allowed for videos.'
+          });
+        }
+        throw err; // This will be caught by the catch block
+      }
+
+      // Check if file was uploaded
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No video file provided or file upload failed',
+          receivedFile: false
+        });
+      }
+
+      // Get video details
+      const videoUrl = req.file.path;
+      const fileName = req.file.originalname;
+      const fileType = req.file.mimetype;
+      const fileSize = req.file.size;
+      
+      // For videos, we'll use the first frame as thumbnail if available
+      const thumbnail = req.file.thumbnail || null;
+      
+      const responseData = { 
+        success: true,
+        url: videoUrl,
+        fileName,
+        fileType,
+        fileSize,
+        thumbnail,
+        duration: req.file.duration || null,
+        publicId: req.file.filename,
+        type: 'video'
+      };
+
+      console.log('Video upload successful:', responseData);
+      return res.status(200).json(responseData);
+      
+    } catch (error) {
+      console.error('Error in video upload endpoint:', {
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+        name: error.name
+      });
+      
+      // Pass the error to the Express error handler
+      next(error);
+    }
+  });
 });
 
 router.post("/", async (req, res) => {

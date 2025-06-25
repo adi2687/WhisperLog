@@ -67,8 +67,47 @@ app.use('/friends', friendRequestRoute);
 app.use('/logout', logoutRoute);
 app.use('/message', messageRoute);
 app.use('/notification', notificationRoute);
-// Mount auth routes
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    method: req.method,
+    url: req.originalUrl,
+    body: req.body,
+    params: req.params,
+    query: req.query,
+    headers: req.headers
+  });
+
+  // Handle multer errors
+  if (err.name === 'MulterError') {
+    return res.status(400).json({
+      success: false,
+      message: `File upload error: ${err.message}`,
+      code: err.code,
+      field: err.field
+    });
+  }
+
+  // Handle other errors
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.originalUrl
+  });
+});
 
 const server = http.createServer(app);
 
@@ -87,12 +126,12 @@ const chatMessages = {};
 import messageModel from '../models/message.model.js'; 
 
 io.on('connection', (socket) => {
-  console.log('a user connected', socket.id);
+  // console.log('a user connected', socket.id);
 
   socket.on('joinchat', async ({ chatId }) => {
     if (!chatId) return;
     socket.join(chatId);
-    console.log('joined chat', chatId);
+    // console.log('joined chat', chatId);
 
     // Send existing messages to the new client
     try {
