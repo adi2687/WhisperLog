@@ -230,7 +230,7 @@ const Homepage = () => {
                 <img src="/female.jpeg" alt="" />
               </div>
               <div className="chat-info">
-                <div className="chat-name">Maya Johnson</div>
+                <div className="chat-name-main">Maya Johnson</div>
                 <div className="chat-status">End-to-end encrypted</div>
               </div>
               <div className="chat-actions">

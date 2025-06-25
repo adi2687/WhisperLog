@@ -1,0 +1,75 @@
+/* Main container styles */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: #121212;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+
+.contacts-panel,
+.chat-panel {
+  transition: transform 0.3s ease-in-out;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+/* Responsive layout for mobile */
+@media (max-width: 768px) {
+  .contacts-panel {
+    transform: translateX(0);
+    z-index: 2;
+  }
+  
+  .chat-panel {
+    transform: translateX(100%);
+    z-index: 1;
+  }
+  
+  .contacts-panel.active {
+    transform: translateX(0);
+  }
+  
+  .chat-panel.active {
+    transform: translateX(0);
+  }
+  
+  .main-content.chat-active .contacts-panel {
+    transform: translateX(-100%);
+  }
+  
+  .main-content.chat-active .chat-panel {
+    transform: translateX(0);
+  }
+}
+
+/* For larger screens */
+@media (min-width: 769px) {
+  .contacts-panel {
+    position: relative;
+    flex: 0 0 350px;
+    border-right: 1px solid #333;
+    transform: none !important;
+  }
+  
+  .chat-panel {
+    position: relative;
+    flex: 1;
+    transform: none !important;
+  }
+}

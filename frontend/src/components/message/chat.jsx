@@ -10,10 +10,11 @@ import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
-export default function Chat({ chatId }) {
+export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const location = useLocation();
-  const [receiver, setReceiver] = useState(location.state?.receiver);
-  const [receiverdetails, setReceiverdetails] = useState(location.state?.receiverUsername);
+  // Use props if available, otherwise fall back to location state
+  const [currentReceiver, setCurrentReceiver] = useState(receiver || location.state?.receiver);
+  const [currentReceiverDetails, setCurrentReceiverDetails] = useState(receiverDetails || location.state?.receiverUsername);
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -23,11 +24,11 @@ export default function Chat({ chatId }) {
   const user = useProfileCurrentUser().profile;
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
-  // Update receiver if location changes
+  // Update receiver if props or location changes
   useEffect(() => {
-    setReceiver(location.state?.receiver);
-    setReceiverdetails(location.state?.receiverUsername);
-  }, [location.state?.receiver]);
+    if (receiver) setCurrentReceiver(receiver);
+    if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
+  }, [receiver, receiverDetails]);
 
   // Join the chat room
   useEffect(() => {
@@ -125,22 +126,7 @@ export default function Chat({ chatId }) {
       // Send the message through the socket
       socket.emit('message', messageData);
       
-      // Also send to the backend API for persistence
-      try {
-        await axios.post(
-          `${import.meta.env.VITE_BACKEND_URL}/message`,
-          messageData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }
-        );
-      } catch (error) {
-        console.error('Error saving message to database:', error);
-        // Don't show error to user as the message was still sent via socket
-      }
+      
       
       // Reset states
       setMessage('');
@@ -207,37 +193,43 @@ export default function Chat({ chatId }) {
   }, [chatId])
   return (
     <div className="chat-container">
-      {receiverdetails && (
+      {currentReceiverDetails && (
         <div className="chat-header">
+          {onBack && (
+            <button 
+              onClick={onBack} 
+              className="back-button"
+              aria-label="Back to contacts"
+            >
+              &larr;
+            </button>
+          )}
           <div className="user-info">
             <div className="avatar">
-              <img src={receiverdetails.profilePicture || '/default-avatar.svg'} alt="" />
+              <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
             </div>
             <div className='userdetails'>
               <div>
-              <div className="user-name">{receiverdetails.username || 'Unknown User'}</div>
-              {/* <div className='bio'>{receiverdetails?.bio || 'No bio'}</div> */}
+              <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
               <div className="user-status">Online</div> 
               </div>
               <button onClick={() => setviewcard(!view)} className='view-profile-btn'>
                 {view ? (
                   <>
-                  <FaUser/>
-                  <p>Hover over card</p>
+                    <FaUser/>
+                    <p>Hover over card</p>
                   </>
                 ) : (
                   <>
-                  <FaUser/>
-                  <p>View Profile Card</p>
+                    <FaUser/>
+                    <p>View Profile Card</p>
                   </>
                 )}
-                </button>
+              </button>
               <div className="profile-card-main">
-                {view ? 
-                <div> 
-                (<ProfileCard receiverdetails={receiverdetails} setviewcard={setviewcard} />)
-                </div>
-                : null}
+                {view && (
+                  <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setviewcard} />
+                )}
               </div>
             </div>
           </div>

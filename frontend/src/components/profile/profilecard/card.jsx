@@ -11,7 +11,7 @@ export default function Card({receiverdetails,setviewcard}) {
       height: '100vh',
       position: 'relative',
     }}>
-      <FaTimes onClick={()=>setviewcard(false)} style={{position:'absolute',top:'10px',right:'10px',cursor:'pointer'}}/>
+      <FaTimes onClick={()=>setviewcard(false)} style={{position:'absolute',top:'28%',left:'100%',cursor:'pointer',zIndex:"1"}}/>
       <TiltedCard
         imageSrc={receiverdetails.profilePicture || '/default-avatar.svg'}
         altText={receiverdetails.username}
