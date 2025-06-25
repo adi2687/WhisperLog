@@ -6,6 +6,9 @@
   width: 100%;
   overflow: hidden;
   background-color: #121212;
+  border:1px solid blue;
+  height:95vh;
+  position: fixed;
 }
 
 .main-content {

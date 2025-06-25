@@ -27,6 +27,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifQuery, setGifQuery] = useState('');
   const [gifs, setGifs] = useState([]);
+  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
   const inputRef = useRef(null);
@@ -352,12 +353,11 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         ...(fileData && fileData)
       });
 
-      // Clear the input and selected files/GIF/video
+      // Clear the input and selected files/GIF
       setMessage('');
       setSelectedImage(null);
       setSelectedFile(null);
       setSelectedGif(null);
-      setSelectedVideo(null);
     } catch (error) {
       console.error('Error sending message:', error);
       alert(error.message || 'Failed to send message');
@@ -603,11 +603,13 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               key={index}
               className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
             >
+              <div className='message-main'>
               <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
                 {renderMessageContent(msg)}
                 <span className="message-time">
                   {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
                 </span>
+              </div>
               </div>
             </div>
           ))
@@ -695,7 +697,16 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       )}
 
       <div className="chat-input-container">
-        <div className="file-input-wrapper">
+        <div className={`input-icons ${isMenuExpanded ? 'expanded' : ''}`}>
+          <button 
+            className="menu-toggle" 
+            onClick={() => setIsMenuExpanded(!isMenuExpanded)}
+            title="More options"
+          >
+            <FiPaperclip size={20} />
+          </button>
+          <div className="menu-options">
+            <div className="file-input-wrapper">
           <input
             type="file"
             id="image-upload"
@@ -711,10 +722,10 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         
         <button 
           type="button" 
-          className="gif-btn"
+          className="attachment-btn"
           onClick={() => setShowGifPicker(!showGifPicker)}
           disabled={isUploading || selectedFile || selectedImage}
-          title="Send GIF"
+          title="Send GIF"  
         >
           <FiGift size={20} />
         </button>
@@ -768,7 +779,10 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           <label htmlFor="file-upload" className="attachment-btn" title="Send file">
             <FiFile size={20} />
           </label>
+            </div>
+          </div>
         </div>
+        
         <div className="input-wrapper">
           <input
             ref={inputRef}
