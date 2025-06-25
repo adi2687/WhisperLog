@@ -10,8 +10,12 @@ const messageSchema=new mongoose.Schema({
         required:true
     },
     message:{
-        type:String,
-        required:true
+        type: String,
+        required: function() {
+            // Message is required only if there's no image
+            return !this.imageUrl;
+        },
+        default: ''
     },
     timestamp:{
         type:Date,
@@ -24,6 +28,10 @@ const messageSchema=new mongoose.Schema({
     chatId:{
         type:String,
         required:true
+    },
+    imageUrl: {
+        type: String,
+        default: null
     }
 },{timestamps:true})
 

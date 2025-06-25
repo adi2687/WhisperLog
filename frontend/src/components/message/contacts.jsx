@@ -78,8 +78,13 @@ export default function Contacts() {
     
     return (
         <div className="contacts-container">
+            <div className="contacts-header">
+                <h2 className="contacts-title">
+                    <FaUserFriends />
+                    Contacts
+                </h2>
+            </div>
             
-
             <div className="search-bar">
                 <div className="search-input">
                     <FaSearch className="search-icon" />

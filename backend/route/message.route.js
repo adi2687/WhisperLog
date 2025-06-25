@@ -18,14 +18,92 @@ function makeRandomId() {
     return final;
 }
 
+// Configure Cloudinary
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import multer from 'multer';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Configure Cloudinary with your credentials
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Configure Cloudinary storage for chat images
+const chatImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'whisperlog/chat-images',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    transformation: [
+      { width: 1000, height: 1000, crop: 'limit', quality: 'auto' },
+      { fetch_format: 'auto' }
+    ]
+  },
+});
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: chatImageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed (jpeg, png, gif, webp)'));
+    }
+  },
+});
+
+// Endpoint to handle image uploads
+router.post('/upload-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+
+    // Get the Cloudinary URL from the uploaded file
+    const imageUrl = req.file.path;
+    
+    res.status(200).json({ 
+      url: imageUrl,
+      publicId: req.file.filename
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File size too large. Maximum 5MB allowed.' });
+    } else if (error.message.includes('file type')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ 
+      message: 'Error uploading image', 
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 router.post("/", async (req, res) => {
-    const { senderId, receiverId, message, chatId } = req.body;
-    console.log(req.body)
+    const { senderId, receiverId, message, chatId, imageUrl } = req.body;
+    
+    // Validate that either message or imageUrl is provided
+    if ((!message || message.trim() === '') && !imageUrl) {
+        return res.status(400).json({ 
+            message: "Either message text or image is required",
+            received: Object.keys(req.body)
+        });
+    }
+    
     // Validate required fields
-    if (!senderId || !receiverId || !message || !chatId) {
+    if (!senderId || !receiverId || !chatId) {
         return res.status(400).json({ 
             message: "Missing required fields",
-            required: ["senderId", "receiverId", "message", "chatId"],
+            required: ["senderId", "receiverId", "chatId"],
             received: Object.keys(req.body)
         });
     }
@@ -34,17 +112,23 @@ router.post("/", async (req, res) => {
         const newMessage = new MessageModel({
             senderId,
             receiverId,
-            message,
+            message: message || '', // Make message optional if image is present
             timestamp: Date.now(),
             isRead: false,
-            chatId
+            chatId,
+            imageUrl: imageUrl || null
         });
         
         const savedMessage = await newMessage.save();
         
         // Emit socket event for real-time update
         if (req.app.get('io')) {
-            req.app.get('io').to(chatId).emit('new_message', savedMessage);
+            const io = req.app.get('io');
+            // Emit to the specific chat room
+            io.to(chatId).emit('message', savedMessage);
+            // Also emit to the sender and receiver for real-time updates in their chat lists
+            io.to(senderId).emit('message', savedMessage);
+            io.to(receiverId).emit('message', savedMessage);
         }
         
         res.status(200).json({ 

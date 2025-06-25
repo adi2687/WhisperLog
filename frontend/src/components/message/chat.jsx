@@ -40,13 +40,22 @@ export default function Chat({ chatId }) {
   // Handle file selection
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        alert('Image size should be less than 5MB');
-        return;
-      }
-      setSelectedImage(file);
+    if (!file) return;
+    
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Only JPG, PNG, GIF, and WebP images are allowed');
+      return;
     }
+    
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size should be less than 5MB');
+      return;
+    }
+    
+    setSelectedImage(file);
   };
 
   // Remove selected image
@@ -57,21 +66,27 @@ export default function Chat({ chatId }) {
     }
   };
 
-  // Upload image to Cloudinary
+  // Upload image to backend using FormData
   const uploadImage = async (file) => {
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'whisperlog_chat');
+    formData.append('image', file);
     
     try {
       const response = await axios.post(
-        'https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/upload',
-        formData
+        `${import.meta.env.VITE_BACKEND_URL}/message/upload-image`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          withCredentials: true
+        }
       );
-      return response.data.secure_url;
+      return response.data.url;
     } catch (error) {
       console.error('Error uploading image:', error);
-      return null;
+      throw error;
     }
   };
 
@@ -85,17 +100,47 @@ export default function Chat({ chatId }) {
     try {
       // Upload image if selected
       if (selectedImage) {
-        imageUrl = await uploadImage(selectedImage);
+        try {
+          imageUrl = await uploadImage(selectedImage);
+        } catch (error) {
+          console.error('Failed to upload image:', error);
+          alert('Failed to upload image. Please try again.');
+          return;
+        }
       }
 
       // Send message with or without image
-      socket.emit('message', { 
+      const messageData = { 
         chatId, 
         message: message.trim(), 
         senderId: user._id, 
-        receiverId: receiver,
-        imageUrl
-      });
+        receiverId: receiver
+      };
+
+      // Only add imageUrl if it exists
+      if (imageUrl) {
+        messageData.imageUrl = imageUrl;
+      }
+
+      // Send the message through the socket
+      socket.emit('message', messageData);
+      
+      // Also send to the backend API for persistence
+      try {
+        await axios.post(
+          `${import.meta.env.VITE_BACKEND_URL}/message`,
+          messageData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Error saving message to database:', error);
+        // Don't show error to user as the message was still sent via socket
+      }
       
       // Reset states
       setMessage('');
@@ -105,6 +150,7 @@ export default function Chat({ chatId }) {
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -203,11 +249,34 @@ export default function Chat({ chatId }) {
           chat.map((msg, index) => (
             <div
               key={index}
-              className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'
-                }`}
+              className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
             >
-              <div className="message-content">
-                <p>{msg.message}</p>
+              <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
+                {msg.imageUrl && (
+                  <div className="message-image">
+                    <img 
+                      src={msg.imageUrl} 
+                      alt="Shared content" 
+                      className="chat-image"
+                      onClick={() => window.open(msg.imageUrl, '_blank')}
+                      onLoad={(e) => {
+                        // Add loaded class when image is loaded
+                        e.target.classList.add('image-loaded');
+                      }}
+                      onError={(e) => {
+                        // Handle image loading errors
+                        e.target.src = '/image-error.png';
+                        e.target.classList.add('image-error');
+                      }}
+                    />
+                    {msg.message && (
+                      <div className="image-caption">
+                        {msg.message}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!msg.imageUrl && msg.message && <p>{msg.message}</p>}
                 <span className="message-time">
                   {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
                 </span>

@@ -103,18 +103,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('message', async ({ chatId, message, senderId, receiverId }) => {
+  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl }) => {
     try {
-      console.log('New message:', { chatId, senderId, receiverId, message });
+      console.log('New message:', { chatId, senderId, receiverId, message, imageUrl });
       
       // Create and save the message
       const newMessage = new messageModel({
         chatId,
-        message,
+        message: message || '',
         timestamp: Date.now(),
         senderId,
         receiverId,
-        isRead: false
+        isRead: false,
+        imageUrl: imageUrl || null
       });
       
       const savedMessage = await newMessage.save();
@@ -130,8 +131,14 @@ io.on('connection', (socket) => {
         timestamp: messageObj.timestamp,
         senderId: messageObj.senderId,
         receiverId: messageObj.receiverId,
-        isRead: messageObj.isRead
+        isRead: messageObj.isRead,
+        imageUrl: messageObj.imageUrl || null,
+        createdAt: messageObj.createdAt
       });
+      
+      // Also emit to the sender and receiver for real-time updates in their chat lists
+      io.to(senderId).emit('message', messageObj);
+      io.to(receiverId).emit('message', messageObj);
       
       console.log('Message saved and emitted:', messageObj);
     } catch (error) {
