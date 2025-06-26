@@ -126,7 +126,28 @@ const chatMessages = {};
 import messageModel from '../models/message.model.js'; 
 
 io.on('connection', (socket) => {
-  // console.log('a user connected', socket.id);
+  console.log('a user connected', socket.id);
+
+  // Handle typing indicator
+  socket.on('typing', (data) => {
+    try {
+      if (!data || !data.chatId || !data.userId) {
+        console.warn('Invalid typing event data:', data);
+        return;
+      }
+      console.log('in typing')
+      // Broadcast to all in the chat room except the sender
+      socket.to(data.chatId).emit('typing', {
+        chatId: data.chatId,
+        userId: data.userId,
+        username: data.username
+      });
+      
+      console.log(`User ${data.userId} is typing in chat ${data.chatId}`);
+    } catch (error) {
+      console.error('Error handling typing event:', error);
+    }
+  });
 
   socket.on('joinchat', async ({ chatId }) => {
     if (!chatId) return;

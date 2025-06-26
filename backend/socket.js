@@ -13,6 +13,27 @@ const initSocketHandlers = (io) => {
     io.on('connection', (socket) => {
         console.log('New client connected:', socket.id);
 
+        // Handle typing indicator
+        socket.on('typing', (data) => {
+            try {
+                if (!data || !data.chatId || !data.userId) {
+                    console.warn('Invalid typing event data:', data);
+                    return;
+                }
+                
+                // Broadcast to all in the chat room except the sender
+                socket.to(data.chatId).emit('typing', {
+                    chatId: data.chatId,
+                    userId: data.userId,
+                    username: data.username
+                });
+                
+                console.log(`User ${data.userId} is typing in chat ${data.chatId}`);
+            } catch (error) {
+                console.error('Error handling typing event:', error);
+            }
+        });
+
         // When a user connects, store their userId and socketId
         socket.on('register', (userId) => {
             if (userId) {

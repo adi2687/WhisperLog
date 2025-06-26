@@ -1,7 +1,7 @@
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaSearch, FaUserFriends, FaEllipsisV } from 'react-icons/fa';
+import { FaSearch, FaUserFriends, FaUser } from 'react-icons/fa';
 import './contacts.css';
 
 export default function Contacts() {
@@ -83,6 +83,16 @@ export default function Contacts() {
                     <FaUserFriends />
                     Contacts
                 </h2>
+            </div>
+            <div className='action-buttons'>
+            <button className="add-contact-button" onClick={() => navigate('/addfriend')}>
+                <FaUserFriends />
+                Add Contact
+            </button>
+            <button className="add-contact-button" onClick={() => navigate('/profile')}>
+                <FaUser />
+                Profile
+            </button>
             </div>
             
             <div className="search-bar">

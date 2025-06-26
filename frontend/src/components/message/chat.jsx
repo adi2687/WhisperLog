@@ -19,6 +19,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState({});
+  const typingTimeout = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -38,13 +40,48 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
   }, [receiver, receiverDetails]);
 
-  // Join the chat room
+  // Join the chat room and set up socket listeners
   useEffect(() => {
     if (chatId) {
       console.log('Joining chat:', chatId);
-      socket.emit('joinchat', { chatId }); // Wrap in object
+      socket.emit('join_room', { roomId: chatId, userId: user?._id });
+      
+      // Listen for typing events
+      const handleTyping = (data) => {
+        console.log('Received typing event:', data);
+        if (data.userId !== user?._id) {  // Don't show typing indicator for self
+          setTypingUsers(prev => ({
+            ...prev,
+            [data.userId]: data.username
+          }));
+          
+          // Clear typing indicator after 3 seconds of no typing
+          if (typingTimeout.current) {
+            clearTimeout(typingTimeout.current);
+          }
+          
+          typingTimeout.current = setTimeout(() => {
+            setTypingUsers(prev => {
+              const newTyping = {...prev};
+              delete newTyping[data.userId];
+              return newTyping;
+            });
+          }, 3000);
+        }
+      };
+
+      // Add the event listener
+      socket.on('typing', handleTyping);
+      
+      // Clean up event listeners
+      return () => {
+        socket.off('typing', handleTyping);
+        if (typingTimeout.current) {
+          clearTimeout(typingTimeout.current);
+        }
+      };
     }
-  }, [chatId]);
+  }, [chatId, user?._id]);
 
   // Handle file selection
   const handleImageChange = (e) => {
@@ -309,8 +346,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           // Handle Cloudinary response format
           const videoUrl = result.secure_url || result.url;
           const thumbnailUrl = result.thumbnail || 
-                            (result.eager && result.eager[0]?.url) ||
-                            (result.secure_url && result.secure_url.replace(/\.(mp4|webm|mov|avi|wmv|flv|mkv|3gp|mpeg|mpg|m4v|ogv)$/i, '.jpg'));
+                            (result.eager && result.eager[0]?.url) || 
+                            (result.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${result.public_id}.jpg`);
           
           fileData = { 
             fileUrl: videoUrl, 
@@ -551,6 +588,40 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     return msg.message ? <p>{msg.message}</p> : null;
   };
 
+  // Track last typing emission time
+  const lastTypingTime = useRef(0);
+  const typingDebounce = useRef(null);
+
+  const handleMessageChange = (e) => {
+    const newMessage = e.target.value;
+    setMessage(newMessage);
+    
+    // Emit typing event when user starts typing (throttled to once per second)
+    const now = Date.now();
+    if (newMessage.trim() && chatId && receiver && now - lastTypingTime.current > 1000) {
+      socket.emit('typing', { 
+        chatId, 
+        userId: user._id, 
+        username: user.username 
+      });
+      lastTypingTime.current = now;
+    }
+
+    // Clear any existing timeout
+    if (typingDebounce.current) {
+      clearTimeout(typingDebounce.current);
+    }
+
+    // Set a timeout to stop typing indicator when user stops typing
+    typingDebounce.current = setTimeout(() => {
+      setTypingUsers(prev => {
+        const newTyping = {...prev};
+        delete newTyping[user._id];
+        return newTyping;
+      });
+    }, 3000);
+  };
+
   return (
     <div className="chat-container">
       {currentReceiverDetails && (
@@ -586,6 +657,9 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                   </>
                 )}
               </button>
+              <div className='change-background'>
+                <button>Change background</button>
+              </div>
               <div className="profile-card-main">
                 {view && (
                   <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setviewcard} />
@@ -619,7 +693,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </div>
         )}
         <div ref={messagesEndRef} />
-        {isTyping && (
+        {Object.keys(typingUsers).length > 0 && (
           <div className="typing-indicator">
             <span></span>
             <span></span>
@@ -627,7 +701,6 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </div>
         )}
       </div>
-
       {/* Image preview */}
       {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
         <div className="file-preview-container">
@@ -788,15 +861,15 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             ref={inputRef}
             type="text"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleMessageChange}
             onKeyDown={handleKeyDown}
             placeholder={selectedImage || selectedFile ? 'Add a caption...' : 'Type a message...'}
             className="chat-input"
             disabled={isUploading}
           />
-          <button className="emoji-btn" disabled={isUploading}>
+          {/* <button className="emoji-btn" disabled={isUploading}>
             <FiSmile size={20} />
-          </button>
+          </button> */}
         </div>
         <button
           onClick={handleSendMessage}

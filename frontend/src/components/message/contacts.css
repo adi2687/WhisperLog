@@ -55,7 +55,25 @@
 .contacts-container::-webkit-scrollbar-thumb:hover {
   background: rgba(106, 90, 205, 0.7);
 }
-
+.action-buttons{
+  display: flex;
+  justify-content:start;
+  gap:10px;
+  margin-bottom: 1rem;
+}
+.action-buttons button{
+  padding:10px;
+  border-radius: 20px;
+  border:1px solid white; 
+  background-color: transparent;
+  color:white;
+  display: flex;
+  gap:10px;
+  cursor:pointer;
+}
+.action-buttons button:hover{
+  background-color: rgba(255, 255, 255, 0.05);
+}
 .search-bar {
   display: flex;
   justify-content: center;
