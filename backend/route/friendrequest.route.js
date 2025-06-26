@@ -3,7 +3,7 @@ import { verifyToken } from "../middleware/auth.middleware.js";
 import FriendRequest from "../models/friendreq.model.js";
 import User from "../models/user.model.js";
 import Notification from "../models/notification.model.js";
-import { sendNotification } from '../socket.js';
+import { sendNotification } from '../notificationlive.js';
 
 const router = express.Router();
 
