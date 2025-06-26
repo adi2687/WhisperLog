@@ -1019,7 +1019,6 @@
   .chat-container{
     max-height:100vh;
     margin-top:0%;
-    border:1px solid red
   }
   .message-bubble {
     max-width: 85%;
