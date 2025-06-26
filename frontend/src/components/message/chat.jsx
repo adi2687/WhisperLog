@@ -593,7 +593,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         </div>
       );
     }
-    return msg.message ? <p>{msg.message}</p> : null;
+    return msg.message ? <p style={{color:"white",fontFamily:"Inter",fontSize:"14px"}}>{msg.message}</p> : null;
   };
 
   // Initialize speech recognition on component mount
@@ -757,6 +757,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                   <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
                   <div className="user-status">Online</div>
                 </div>
+                <div className='action-btns'>
                 <button onClick={() => setView(!view)} className='view-profile-btn'>
                   {view ? (
                     <>
@@ -771,8 +772,11 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                   )}
                 </button>
                 <div className='change-background'>
-                  <button>Change background</button>
+                  <button>
+                    <FiImage /> Change background
+                  </button>
                 </div>
+                  </div>
                 <div className="profile-card-main">
                   {view && (
                     <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setView} />
