@@ -995,6 +995,10 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .chat-container{
+    max-height:80vh;
+    margin-top:20%
+  }
   .message-bubble {
     max-width: 85%;
   }
