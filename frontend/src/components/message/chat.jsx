@@ -2,13 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiSmile, FiImage, FiX, FiFile, FiGift, FiVideo } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic } from 'react-icons/fi';
 import { format } from 'date-fns';
 import './chat.css';
 import './GifPicker.css';
 import ProfileCard from '../profile/profilecard/card';
 import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
+import Aurora from '../../pages/Aurora'
+
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
 export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
@@ -30,9 +32,14 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [gifQuery, setGifQuery] = useState('');
   const [gifs, setGifs] = useState([]);
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
   const inputRef = useRef(null);
+  // Track last typing emission time
+  const lastTypingTime = useRef(0);
+  const typingDebounce = useRef(null);
   const fileInputRef = useRef(null);
   // Update receiver if props or location changes
   useEffect(() => {
@@ -506,10 +513,11 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   };
 
-  const [view, setviewcard] = useState(false)
+  // Track if profile card is visible
+  const [view, setView] = useState(false)
 
   useEffect(() => {
-    setviewcard(false)
+    setView(false)
   }, [chatId])
 
   // Render message content based on type
@@ -588,190 +596,293 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     return msg.message ? <p>{msg.message}</p> : null;
   };
 
-  // Track last typing emission time
-  const lastTypingTime = useRef(0);
-  const typingDebounce = useRef(null);
+  // Initialize speech recognition on component mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn('Speech recognition not supported in this browser');
+      return;
+    }
 
+    // Initialize recognition
+    recognitionRef.current = new SpeechRecognition();
+    const recognition = recognitionRef.current;
+    
+    // Configure recognition
+    recognition.continuous = false;  // Get single result per recognition
+    recognition.interimResults = false;  // We only want final results
+    recognition.lang = 'en-US';
+
+    // Event handlers
+    const handleResult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('Speech recognition result:', transcript);
+      setMessage(prev => prev ? `${prev} ${transcript}` : transcript);
+      setIsListening(false);
+    };
+
+    const handleError = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    const handleEnd = () => {
+      console.log('Speech recognition ended');
+      if (isListening) {
+        try {
+          recognition.start();
+          console.log('Restarted speech recognition');
+        } catch (error) {
+          console.error('Error restarting recognition:', error);
+          setIsListening(false);
+        }
+      }
+    };
+
+    // Add event listeners
+    recognition.addEventListener('result', handleResult);
+    recognition.addEventListener('error', handleError);
+    recognition.addEventListener('end', handleEnd);
+
+    // Cleanup function
+    return () => {
+      if (recognition) {
+        console.log('Cleaning up speech recognition');
+        recognition.removeEventListener('result', handleResult);
+        recognition.removeEventListener('error', handleError);
+        recognition.removeEventListener('end', handleEnd);
+        if (isListening) {
+          recognition.stop();
+        }
+      }
+    };
+  }, []);  // Empty dependency array - only run once on mount
+
+  const toggleVoiceRecognition = () => {
+    if (!recognitionRef.current) {
+      console.error('Speech recognition not initialized');
+      return;
+    }
+    
+    if (isListening) {
+      // Stop listening
+      try {
+        console.log('Stopping speech recognition');
+        recognitionRef.current.stop();
+        setIsListening(false);
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+        setIsListening(false);
+      }
+    } else {
+      // Start listening
+      try {
+        console.log('Starting speech recognition');
+        setMessage(''); // Clear previous message
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Error starting voice recognition:', error);
+        setIsListening(false);
+        
+        // Try to reinitialize if there was an error
+        if (error.message.includes('already started')) {
+          console.log('Attempting to reinitialize speech recognition');
+          recognitionRef.current.stop();
+          setTimeout(() => {
+            recognitionRef.current.start();
+            setIsListening(true);
+          }, 100);
+        }
+      }
+    }
+  };
+
+  // Handle message input change
   const handleMessageChange = (e) => {
     const newMessage = e.target.value;
     setMessage(newMessage);
     
-    // Emit typing event immediately when user types
-    if (newMessage.trim() && chatId && receiver) {
-      const now = Date.now();
-      if (now - lastTypingTime.current > 300) { // Reduced from 1000ms to 300ms
-        socket.emit('typing', { 
-          chatId, 
-          userId: user._id, 
-          username: user.username 
-        });
-        lastTypingTime.current = now;
-      }
-    }
-
     // Clear any existing timeout
     if (typingDebounce.current) {
       clearTimeout(typingDebounce.current);
     }
-
-    // Set a shorter timeout to stop typing indicator when user stops typing
-    typingDebounce.current = setTimeout(() => {
-      setTypingUsers(prev => {
-        const newTyping = {...prev};
-        delete newTyping[user._id];
-        return newTyping;
-      });
-    }, 1500); // Reduced from 3000ms to 1500ms
+    
+    // If there's a message, emit typing event
+    if (newMessage.trim()) {
+      const now = Date.now();
+      // Only emit typing event if it's been more than 2 seconds since the last one
+      if (now - lastTypingTime.current > 2000) {
+        socket.emit('typing', { roomId: chatId, userId: user?._id });
+        lastTypingTime.current = now;
+      }
+      
+      // Set up debounce for stopping typing indicator
+      typingDebounce.current = setTimeout(() => {
+        socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
+      }, 2000);
+    } else {
+      socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
+    }
   };
 
   return (
-    <div className="chat-container">
-      {currentReceiverDetails && (
-        <div className="chat-header">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="back-button"
-              aria-label="Back to contacts"
-            >
-              &larr;
-            </button>
-          )}
-          <div className="user-info">
-            <div className="avatar">
-              <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
-            </div>
-            <div className='userdetails'>
-              <div>
-                <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
-                <div className="user-status">Online</div>
-              </div>
-              <button onClick={() => setviewcard(!view)} className='view-profile-btn'>
-                {view ? (
-                  <>
-                    <FaUser />
-                    <p>Hover over card</p>
-                  </>
-                ) : (
-                  <>
-                    <FaUser />
-                    <p>View Profile Card</p>
-                  </>
-                )}
+    <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
+      <div style={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column' 
+      }}>
+        {currentReceiverDetails && (
+          <div className="chat-header">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="back-button"
+                aria-label="Back to contacts"
+              >
+                &larr;
               </button>
-              <div className='change-background'>
-                <button>Change background</button>
+            )}
+            <div className="user-info">
+              <div className="avatar">
+                <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
               </div>
-              <div className="profile-card-main">
-                {view && (
-                  <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setviewcard} />
-                )}
+              <div className='userdetails'>
+                <div>
+                  <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
+                  <div className="user-status">Online</div>
+                </div>
+                <button onClick={() => setView(!view)} className='view-profile-btn'>
+                  {view ? (
+                    <>
+                      <FaUser />
+                      <p>Hover over card</p>
+                    </>
+                  ) : (
+                    <>
+                      <FaUser />
+                      <p>View Profile Card</p>
+                    </>
+                  )}
+                </button>
+                <div className='change-background'>
+                  <button>Change background</button>
+                </div>
+                <div className="profile-card-main">
+                  {view && (
+                    <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setView} />
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      <div className="chat-box">
-        {chat.length > 0 ? (
-          chat.map((msg, index) => (
-            <div
-              key={index}
-              className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
-            >
-              <div className='message-main'>
-              <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
-                {renderMessageContent(msg)}
-                <span className="message-time">
-                  {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
-                </span>
-              </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-messages">
-            <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
           </div>
         )}
-        <div ref={messagesEndRef} />
-        {Object.keys(typingUsers).length > 0 && (
-          <div className="typing-indicator">
-            <span></span>
-            <span></span>
-            <span></span>
+
+        <div className="chat-box">
+          {chat.length > 0 ? (
+            chat.map((msg, index) => (
+              <div
+                key={index}
+                className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
+              >
+                <div className='message-main'>
+                  <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
+                    {renderMessageContent(msg)}
+                    <span className="message-time">
+                      {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="no-messages">
+              <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+          {Object.keys(typingUsers).length > 0 && (
+            <div className="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          )}
+        </div>
+        
+        {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
+          <div className="file-preview-container">
+            <div className="file-preview">
+              {selectedGif ? (
+                <>
+                  <img
+                    src={selectedGif}
+                    alt="GIF Preview"
+                    className="preview-file"
+                    style={{ maxHeight: '100px' }}
+                  />
+                  <div className="file-info">
+                    <div className="file-name">GIF</div>
+                  </div>
+                </>
+              ) : selectedVideo ? (
+                <div className="video-preview">
+                  <video className="preview-video" controls>
+                    <source src={URL.createObjectURL(selectedVideo)} type={selectedVideo.type} />
+                    Your browser does not support the video tag.
+                  </video>
+                  <button
+                    onClick={removeSelectedVideo}
+                    className="remove-file-btn"
+                    title="Remove video"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </div>
+              ) : selectedImage ? (
+                <>
+                  <img
+                    src={URL.createObjectURL(selectedImage)}
+                    alt="Preview"
+                    className="preview-file"
+                  />
+                  <div className="file-info">
+                    <div className="file-name">{selectedImage.name}</div>
+                    <div className="file-size">
+                      {formatFileSize(selectedImage.size)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="file-icon">
+                    {getFileIcon(selectedFile.type)}
+                  </div>
+                  <div className="file-info">
+                    <div className="file-name">{selectedFile.name}</div>
+                    <div className="file-size">
+                      {formatFileSize(selectedFile.size)}
+                    </div>
+                  </div>
+                </>
+              )}
+              <button
+                onClick={selectedImage ? removeSelectedImage : removeSelectedFile}
+                className="remove-file-btn"
+                title={selectedImage ? 'Remove image' : 'Remove file'}
+              >
+                <FiX size={16} />
+              </button>
+            </div>
           </div>
         )}
       </div>
       
-      {/* Image preview */}
-      {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
-        <div className="file-preview-container">
-          <div className="file-preview">
-            {selectedGif ? (
-              <>
-                <img
-                  src={selectedGif}
-                  alt="GIF Preview"
-                  className="preview-file"
-                  style={{ maxHeight: '100px' }}
-                />
-                <div className="file-info">
-                  <div className="file-name">GIF</div>
-                </div>
-              </>
-            ) : selectedVideo ? (
-              <div className="video-preview">
-                <video className="preview-video" controls>
-                  <source src={URL.createObjectURL(selectedVideo)} type={selectedVideo.type} />
-                  Your browser does not support the video tag.
-                </video>
-                <button
-                  onClick={removeSelectedVideo}
-                  className="remove-file-btn"
-                  title="Remove video"
-                >
-                  <FiX size={16} />
-                </button>
-              </div>
-            ) : selectedImage ? (
-              <>
-                <img
-                  src={URL.createObjectURL(selectedImage)}
-                  alt="Preview"
-                  className="preview-file"
-                />
-                <div className="file-info">
-                  <div className="file-name">{selectedImage.name}</div>
-                  <div className="file-size">
-                    {formatFileSize(selectedImage.size)}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="file-icon">
-                  {getFileIcon(selectedFile.type)}
-                </div>
-                <div className="file-info">
-                  <div className="file-name">{selectedFile.name}</div>
-                  <div className="file-size">
-                    {formatFileSize(selectedFile.size)}
-                  </div>
-                </div>
-              </>
-            )}
-            <button
-              onClick={selectedImage ? removeSelectedImage : removeSelectedFile}
-              className="remove-file-btn"
-              title={selectedImage ? 'Remove image' : 'Remove file'}
-            >
-              <FiX size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="chat-input-container">
         <div className={`input-icons ${isMenuExpanded ? 'expanded' : ''}`}>
           <button 
@@ -783,78 +894,80 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </button>
           <div className="menu-options">
             <div className="file-input-wrapper">
-          <input
-            type="file"
-            id="image-upload"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="file-input"
-            disabled={isUploading || selectedFile || selectedGif}
-          />
-          <label htmlFor="image-upload" className="attachment-btn" title="Send image">
-            <FiImage size={20} />
-          </label>
-        </div>
-        
-        <button 
-          type="button" 
-          className="attachment-btn"
-          onClick={() => setShowGifPicker(!showGifPicker)}
-          disabled={isUploading || selectedFile || selectedImage}
-          title="Send GIF"  
-        >
-          <FiGift size={20} />
-        </button>
-        
-        {showGifPicker && (
-          <div className="gif-picker">
-            <input
-              type="text"
-              placeholder="Search GIFs..."
-              value={gifQuery}
-              onChange={(e) => {
-                setGifQuery(e.target.value);
-                searchGifs(e.target.value);
-              }}
-              className="gif-search"
-            />
-            <div className="gif-grid">
-              {gifs.map((gif) => (
-                <img
-                  key={gif.id}
-                  src={gif.images.fixed_height_small.url}
-                  alt={gif.title}
-                  className="gif-item"
-                  onClick={() => handleGifSelect(gif)}
-                />
-              ))}
+              <input
+                type="file"
+                id="image-upload"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="file-input"
+                disabled={isUploading || selectedFile || selectedGif}
+              />
+              <label htmlFor="image-upload" className="attachment-btn" title="Send image">
+                <FiImage size={20} />
+              </label>
             </div>
-          </div>
-        )}
-        <div className="file-input-wrapper">
-          <input
-            type="file"
-            id="video-upload"
-            accept="video/*"
-            onChange={handleVideoChange}
-            className="file-input"
-            disabled={isUploading || selectedImage || selectedFile || selectedGif}
-          />
-          <label htmlFor="video-upload" className="attachment-btn" title="Send video">
-            <FiVideo size={20} />
-          </label>
-        </div>
-        <div className="file-input-wrapper">
-          <input
-            type="file"
-            id="file-upload"
-            onChange={handleFileChange}
-            className="file-input"
-            disabled={isUploading || selectedImage || selectedVideo || selectedGif}
-          />
-          <label htmlFor="file-upload" className="attachment-btn" title="Send file">
-            <FiFile size={20} />
-          </label>
+            
+            <button 
+              type="button" 
+              className="attachment-btn"
+              onClick={() => setShowGifPicker(!showGifPicker)}
+              disabled={isUploading || selectedFile || selectedImage}
+              title="Send GIF"
+            >
+              <FiGift size={20} />
+            </button>
+            
+            {showGifPicker && (
+              <div className="gif-picker">
+                <input
+                  type="text"
+                  placeholder="Search GIFs..."
+                  value={gifQuery}
+                  onChange={(e) => {
+                    setGifQuery(e.target.value);
+                    searchGifs(e.target.value);
+                  }}
+                  className="gif-search"
+                />
+                <div className="gif-grid">
+                  {gifs.map((gif) => (
+                    <img
+                      key={gif.id}
+                      src={gif.images.fixed_height_small.url}
+                      alt={gif.title}
+                      className="gif-item"
+                      onClick={() => handleGifSelect(gif)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="file-input-wrapper">
+              <input
+                type="file"
+                id="video-upload"
+                accept="video/*"
+                onChange={handleVideoChange}
+                className="file-input"
+                disabled={isUploading || selectedImage || selectedFile || selectedGif}
+              />
+              <label htmlFor="video-upload" className="attachment-btn" title="Send video">
+                <FiVideo size={20} />
+              </label>
+            </div>
+            
+            <div className="file-input-wrapper">
+              <input
+                type="file"
+                id="file-upload"
+                onChange={handleFileChange}
+                className="file-input"
+                disabled={isUploading || selectedImage || selectedVideo || selectedGif}
+              />
+              <label htmlFor="file-upload" className="attachment-btn" title="Send file">
+                <FiFile size={20} />
+              </label>
             </div>
           </div>
         </div>
@@ -870,10 +983,26 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             className="chat-input"
             disabled={isUploading}
           />
-          {/* <button className="emoji-btn" disabled={isUploading}>
-            <FiSmile size={20} />
-          </button> */}
+          
+          <div className="voice-input-container">
+            {isListening && (
+              <div className="recording-indicator">
+                <span className="pulse-dot"></span>
+                <span className="recording-text">Listening...</span>
+              </div>
+            )}
+            <button 
+              type="button"
+              className={`voice-btn ${isListening ? 'listening' : ''}`}
+              onClick={toggleVoiceRecognition}
+              disabled={isUploading}
+              title={isListening ? 'Stop listening' : 'Voice input'}
+            >
+              <FiMic size={20} className={isListening ? 'pulse' : ''} />
+            </button>
+          </div>
         </div>
+        
         <button
           onClick={handleSendMessage}
           className="send-btn"
@@ -888,4 +1017,4 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       </div>
     </div>
   );
-}
+};

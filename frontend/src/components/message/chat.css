@@ -789,6 +789,91 @@
 }
 
 /* Typing Indicator */
+/* Voice Input */
+.voice-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 77, 77, 0.15);
+  padding: 4px 10px;
+  border-radius: 15px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #ff4d4d;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+.recording-text {
+  color: #ff4d4d;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Voice Input Button */
+.voice-btn {
+  background: none;
+  border: none;
+  color: #8a63d2;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.voice-btn:hover {
+  background-color: rgba(138, 99, 210, 0.1);
+  color: #9c7ae6;
+}
+
+.voice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-btn.listening {
+  color: #ff4d4d;
+  background-color: rgba(255, 77, 77, 0.1);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 77, 77, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 77, 0);
+  }
+}
+
+.voice-btn .pulse {
+  animation: pulse 2s infinite;
+}
+
 .typing-indicator {
   display: flex;
   align-items: center;

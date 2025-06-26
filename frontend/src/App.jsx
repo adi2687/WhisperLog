@@ -19,7 +19,7 @@ import AnimatedList from './components/List/list';
 import Card from './components/profile/profilecard/card';
 import AddFriend from './components/AddFriend/AddFriend';
 import Message from './components/message/main'
-
+import Aurora from './pages/main'
 // imp
 // Protected route component
 
@@ -49,6 +49,7 @@ function App() {
                     <Route path="/profilecard" element={<Card />} />
                     <Route path="/addFriend" element={<AddFriend />} />
                     <Route path="/chat/:id" element={<Message />} />
+                    <Route path='/aurora' element={<Aurora />} />
                   </Routes>
                 </main>
                 <Footer />
