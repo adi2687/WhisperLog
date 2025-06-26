@@ -11,6 +11,7 @@
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Oxygen', sans-serif;
   position: relative;
   overflow: hidden;
+  margin-top:3%;
 }
 
 /* Chat Header */
@@ -791,12 +792,10 @@
 .typing-indicator {
   display: flex;
   align-items: center;
-  padding: 4px 12px;
-  background-color: #2d2d2d;
-  border-radius: 15px;
-  margin-left: 10px;
-  margin-bottom: 5px;
-  max-width: fit-content;
+  position: absolute;
+  top:84%;
+  left:1%;
+  padding:10px
 }
 
 .typing-indicator span {
@@ -806,27 +805,28 @@
   background-color: #8a63d2;
   border-radius: 50%;
   display: inline-block;
-  opacity: 0.4;
-  animation: typing-dots 1.4s infinite ease-in-out both;
+  opacity: 0.6;
+  animation: typing-dots 0.9s infinite ease-in-out both;
+  will-change: transform, opacity;
 }
 
 .typing-indicator span:nth-child(1) { 
-  animation-delay: -0.32s; 
+  animation-delay: 0s; 
 }
 .typing-indicator span:nth-child(2) { 
-  animation-delay: -0.16s; 
+  animation-delay: 0.15s; 
 }
 .typing-indicator span:nth-child(3) { 
-  animation-delay: 0s; 
+  animation-delay: 0.3s; 
 }
 
 @keyframes typing-dots {
-  0%, 80%, 100% { 
-    transform: scale(0.6);
-    opacity: 0.3;
+  0%, 100% { 
+    transform: translateY(0);
+    opacity: 0.6;
   } 
-  40% { 
-    transform: scale(1);
+  50% { 
+    transform: translateY(-4px);
     opacity: 1;
   }
 }
@@ -947,6 +947,11 @@
   
   .chat-input {
     font-size: 14px;
+  }
+  .typing-indicator{
+    top:88%;
+    left:3%;
+    padding:10px
   }
 }
 .message-bubble.sent .message-content {

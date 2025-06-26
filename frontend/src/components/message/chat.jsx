@@ -596,15 +596,17 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     const newMessage = e.target.value;
     setMessage(newMessage);
     
-    // Emit typing event when user starts typing (throttled to once per second)
-    const now = Date.now();
-    if (newMessage.trim() && chatId && receiver && now - lastTypingTime.current > 1000) {
-      socket.emit('typing', { 
-        chatId, 
-        userId: user._id, 
-        username: user.username 
-      });
-      lastTypingTime.current = now;
+    // Emit typing event immediately when user types
+    if (newMessage.trim() && chatId && receiver) {
+      const now = Date.now();
+      if (now - lastTypingTime.current > 300) { // Reduced from 1000ms to 300ms
+        socket.emit('typing', { 
+          chatId, 
+          userId: user._id, 
+          username: user.username 
+        });
+        lastTypingTime.current = now;
+      }
     }
 
     // Clear any existing timeout
@@ -612,14 +614,14 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       clearTimeout(typingDebounce.current);
     }
 
-    // Set a timeout to stop typing indicator when user stops typing
+    // Set a shorter timeout to stop typing indicator when user stops typing
     typingDebounce.current = setTimeout(() => {
       setTypingUsers(prev => {
         const newTyping = {...prev};
         delete newTyping[user._id];
         return newTyping;
       });
-    }, 3000);
+    }, 1500); // Reduced from 3000ms to 1500ms
   };
 
   return (
@@ -701,6 +703,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </div>
         )}
       </div>
+      
       {/* Image preview */}
       {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
         <div className="file-preview-container">
