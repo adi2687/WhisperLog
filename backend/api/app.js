@@ -5,8 +5,8 @@ import cookieParser from 'cookie-parser';
 import http from 'http';
 import { Server } from 'socket.io';
 dotenv.config();
-const mongoUrl=process.env.MONGODB_URI;
-// console.log(mongoUrl)
+const mongoUrl = process.env.MONGODB_URI;
+
 // MongoDB connection
 import connect from '../db/connection.js';
 connect(mongoUrl);
@@ -23,11 +23,12 @@ import messageRoute from '../route/message.route.js';
 import notificationRoute from '../route/sendnotification.route.js';
 
 const PORT = process.env.PORT || 5000;
-const frontend=process.env.FRONTEND_URL;
+const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 const app = express();
+const server = http.createServer(app);
 
 // CORS configuration
-const allowedOrigins = [frontend,'http://localhost:5173','https://whisperlog.vercel.app'];
+const allowedOrigins = [frontend, 'http://localhost:5173', 'https://whisperlog.vercel.app'];
 
 // Enable CORS for all routes
 app.use((req, res, next) => {
@@ -109,13 +110,10 @@ app.use((req, res) => {
   });
 });
 
-const server = http.createServer(app);
-
-
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true
   },
   pingTimeout: 60000, // optional
@@ -125,10 +123,60 @@ const io = new Server(server, {
 const chatMessages = {};
 import messageModel from '../models/message.model.js'; 
 
-io.on('connection', (socket) => {
-  console.log('a user connected', socket.id);
+// Store active video call rooms and their participants
+const videoRooms = new Map();
 
-  // Handle typing indicator
+// Handle video call connections
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Video call room management
+  socket.on('join-room', (roomId, userId) => {
+    console.log(`User ${socket.id} joining room ${roomId}`);
+    
+    // Create room if it doesn't exist
+    if (!videoRooms.has(roomId)) {
+      videoRooms.set(roomId, new Set());
+    }
+    
+    const room = videoRooms.get(roomId);
+    room.add(socket.id);
+    socket.join(roomId);
+    
+    // Notify other users in the room about new user
+    socket.to(roomId).emit('user-connected', { userId: socket.id });
+    
+    // Send list of existing users to the new user
+    const usersInRoom = Array.from(room).filter(id => id !== socket.id);
+    socket.emit('existing-users', usersInRoom);
+  });
+
+  // WebRTC signaling
+  socket.on('offer', (data) => {
+    console.log(`Offer from ${socket.id} to ${data.target}`);
+    socket.to(data.target).emit('offer', {
+      offer: data.offer,
+      sender: socket.id
+    });
+  });
+
+  socket.on('answer', (data) => {
+    console.log(`Answer from ${socket.id} to ${data.target}`);
+    socket.to(data.target).emit('answer', {
+      answer: data.answer,
+      sender: socket.id
+    });
+  });
+
+  socket.on('ice-candidate', (data) => {
+    console.log(`ICE candidate from ${socket.id} to ${data.target}`);
+    socket.to(data.target).emit('ice-candidate', {
+      candidate: data.candidate,
+      sender: socket.id
+    });
+  });
+
+  // Handle chat functionality
   socket.on('typing', (data) => {
     try {
       if (!data || !data.chatId || !data.userId) {

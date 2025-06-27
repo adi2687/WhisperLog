@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiVideoOff } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import './chat.css';
 import './GifPicker.css';
@@ -36,6 +37,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const user = useProfileCurrentUser().profile;
+  const navigate = useNavigate();
   const inputRef = useRef(null);
   // Track last typing emission time
   const lastTypingTime = useRef(0);
@@ -756,6 +758,40 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                 <div>
                   <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
                   <div className="user-status">Online</div>
+                </div>
+                <div className='call-btns'>
+                  <button 
+                    onClick={() => {
+                      const roomId = `call_${Date.now()}_${user._id}_${receiver}`;
+                      navigate(`/video-call/${roomId}`, { 
+                        state: { 
+                          isInitiator: true,
+                          callType: 'video',
+                          receiverId: receiver,
+                          receiverName: currentReceiverDetails?.username || 'User'
+                        } 
+                      });
+                    }}
+                    title="Start video call"
+                  >
+                    <FiVideo />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const roomId = `call_${Date.now()}_${user._id}_${receiver}`;
+                      navigate(`/video-call/${roomId}`, { 
+                        state: { 
+                          isInitiator: true,
+                          callType: 'audio',
+                          receiverId: receiver,
+                          receiverName: currentReceiverDetails?.username || 'User'
+                        } 
+                      });
+                    }}
+                    title="Start audio call"
+                  >
+                    <FiPhone />
+                  </button>
                 </div>
                 <div className='action-btns'>
                 <button onClick={() => setView(!view)} className='view-profile-btn'>

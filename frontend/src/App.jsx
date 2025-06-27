@@ -15,11 +15,13 @@ import Notfound from './components/Notfound/notfound';
 import ProfileOthersPage from './components/profile/ProfilePage';
 import ProfilePage from './components/profile/UserProfileSection';
 import { CurrentUserProfileProvider } from './contexts/ProfileContext';
+import { CallProvider } from './contexts/CallContext';
 import AnimatedList from './components/List/list';
 import Card from './components/profile/profilecard/card';
 import AddFriend from './components/AddFriend/AddFriend';
-import Message from './components/message/main'
-import Aurora from './pages/main'
+import Message from './components/message/main';
+import Aurora from './pages/main';
+import VideoCall from './components/video/VideoCall';
 // imp
 // Protected route component
 
@@ -33,9 +35,10 @@ function App() {
         {/* <WebSocketProvider> */}
           <ProfileProvider>
             <CurrentUserProfileProvider>
-              <div className="app">
-                <Navbar />
-                <main>
+              <CallProvider>
+                <div className="app">
+                  <Navbar />
+                  <main>
                   <Routes>
                     <Route path="/" element={<Homepage />} />
                     <Route path="/chat" element={<Main />} />
@@ -49,11 +52,13 @@ function App() {
                     <Route path="/profilecard" element={<Card />} />
                     <Route path="/addFriend" element={<AddFriend />} />
                     <Route path="/chat/:id" element={<Message />} />
+                    <Route path="/video-call/:roomId" element={<VideoCall />} />
                     <Route path='/aurora' element={<Aurora />} />
                   </Routes>
-                </main>
-                <Footer />
-              </div>
+                  </main>
+                  <Footer />
+                </div>
+              </CallProvider>
             </CurrentUserProfileProvider>
           </ProfileProvider>
         {/* </WebSocketProvider> */}

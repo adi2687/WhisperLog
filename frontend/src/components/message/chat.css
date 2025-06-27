@@ -34,6 +34,27 @@
   align-items: center;
   gap: 12px;
 }
+.call-btns{
+  display:flex;
+  gap:19px;
+}
+.call-btns button{
+  background-color: transparent;
+  border:1px solid white; 
+  padding:8px;
+  color:whitesmoke;
+  border-radius: 120px;
+  font-weight: bolder;
+  cursor: pointer;
+  margin:3px;
+  height:30px;
+  display: flex;
+  gap:10px;
+}
+.call-btns button:hover{
+  background-color: white;
+  color: black;
+}
 .userdetails{
   display:flex;
   gap:19px;
