@@ -759,6 +759,10 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                   <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
                   <div className="user-status">Online</div>
                 </div>
+                <div className='call-btns'>
+                  <button>Video Call</button>
+                  <button>Audio Call</button>
+                </div>
                 <div className='action-btns'>
                 <button onClick={() => setView(!view)} className='view-profile-btn'>
                   {view ? (
