@@ -132,6 +132,7 @@ io.on('connection', (socket) => {
   socket.on('typing', (data) => {
     try {
       if (!data || !data.chatId || !data.userId) {
+        console.log(data,data.chatId,data.userId)
         console.warn('Invalid typing event data:', data);
         return;
       }

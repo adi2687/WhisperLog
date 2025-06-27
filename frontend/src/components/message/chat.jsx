@@ -61,7 +61,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             ...prev,
             [data.userId]: data.username
           }));
-          
+          setIsTyping(true);
           // Clear typing indicator after 3 seconds of no typing
           if (typingTimeout.current) {
             clearTimeout(typingTimeout.current);
@@ -73,6 +73,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               delete newTyping[data.userId];
               return newTyping;
             });
+            setIsTyping(false);
+            
           }, 3000);
         }
       };
@@ -715,7 +717,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       const now = Date.now();
       // Only emit typing event if it's been more than 2 seconds since the last one
       if (now - lastTypingTime.current > 2000) {
-        socket.emit('typing', { roomId: chatId, userId: user?._id });
+        socket.emit('typing', { chatId: chatId, userId: user?._id });
         lastTypingTime.current = now;
       }
       
@@ -809,6 +811,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
             </div>
           )}
+          
           <div ref={messagesEndRef} />
           {Object.keys(typingUsers).length > 0 && (
             <div className="typing-indicator">
