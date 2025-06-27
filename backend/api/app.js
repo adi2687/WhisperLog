@@ -124,57 +124,13 @@ const chatMessages = {};
 import messageModel from '../models/message.model.js'; 
 
 // Store active video call rooms and their participants
-const videoRooms = new Map();
 
 // Handle video call connections
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // Video call room management
-  socket.on('join-room', (roomId, userId) => {
-    console.log(`User ${socket.id} joining room ${roomId}`);
-    
-    // Create room if it doesn't exist
-    if (!videoRooms.has(roomId)) {
-      videoRooms.set(roomId, new Set());
-    }
-    
-    const room = videoRooms.get(roomId);
-    room.add(socket.id);
-    socket.join(roomId);
-    
-    // Notify other users in the room about new user
-    socket.to(roomId).emit('user-connected', { userId: socket.id });
-    
-    // Send list of existing users to the new user
-    const usersInRoom = Array.from(room).filter(id => id !== socket.id);
-    socket.emit('existing-users', usersInRoom);
-  });
-
-  // WebRTC signaling
-  socket.on('offer', (data) => {
-    console.log(`Offer from ${socket.id} to ${data.target}`);
-    socket.to(data.target).emit('offer', {
-      offer: data.offer,
-      sender: socket.id
-    });
-  });
-
-  socket.on('answer', (data) => {
-    console.log(`Answer from ${socket.id} to ${data.target}`);
-    socket.to(data.target).emit('answer', {
-      answer: data.answer,
-      sender: socket.id
-    });
-  });
-
-  socket.on('ice-candidate', (data) => {
-    console.log(`ICE candidate from ${socket.id} to ${data.target}`);
-    socket.to(data.target).emit('ice-candidate', {
-      candidate: data.candidate,
-      sender: socket.id
-    });
-  });
+  
 
   // Handle chat functionality
   socket.on('typing', (data) => {
@@ -212,12 +168,23 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl, fileUrl, fileName, fileType, fileSize }) => {
+  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl, fileUrl, fileName, fileType, fileSize, tempMessageId, _id }) => {
     try {
-      console.log('New message:', { chatId, senderId, receiverId, message, imageUrl, fileUrl, fileName, fileType, fileSize });
+      console.log('New message received:', { 
+        tempMessageId,
+        _id,
+        chatId, 
+        senderId, 
+        receiverId, 
+        message: message ? `${message.substring(0, 30)}${message.length > 30 ? '...' : ''}` : 'No text',
+        hasImage: !!imageUrl,
+        hasFile: !!fileUrl,
+        fileType: fileType || 'N/A'
+      });
       
       // Create and save the message
       const newMessage = new messageModel({
+        _id: _id?.startsWith('temp-') ? undefined : _id, // Use server-generated ID if not a temp ID
         chatId,
         message: message || '',
         timestamp: Date.now(),
@@ -228,7 +195,8 @@ io.on('connection', (socket) => {
         fileUrl: fileUrl || null,
         fileName: fileName || null,
         fileType: fileType || null,
-        fileSize: fileSize || null
+        fileSize: fileSize || null,
+        status: 'delivered'
       });
       
       const savedMessage = await newMessage.save();
@@ -236,28 +204,42 @@ io.on('connection', (socket) => {
       // Convert to plain object and remove any circular references
       const messageObj = savedMessage.toObject();
       
-      // Send the message to all clients in the room
-      io.to(chatId).emit('message', {
-        _id: messageObj._id,
-        chatId: messageObj.chatId,
-        message: messageObj.message,
-        timestamp: messageObj.timestamp,
-        senderId: messageObj.senderId,
-        receiverId: messageObj.receiverId,
-        isRead: messageObj.isRead,
-        imageUrl: messageObj.imageUrl || null,
-        fileUrl: messageObj.fileUrl || null,
-        fileName: messageObj.fileName || null,
-        fileType: messageObj.fileType || null,
-        fileSize: messageObj.fileSize || null,
-        createdAt: messageObj.createdAt
+      // Prepare the message data to be sent
+      const messageData = {
+        ...messageObj,
+        // Keep the original _id if this was a temporary message
+        _id: _id?.startsWith('temp-') ? _id : messageObj._id,
+        serverId: messageObj._id, // Always include the server-generated ID
+        status: 'delivered',
+        tempMessageId // Include the temporary ID for client-side reference
+      };
+      
+      // Send the message to the chat room and the receiver's private room
+      // This ensures the message appears in both the chat and the receiver's notification system
+      // without causing duplicates
+      if (chatId) {
+        io.to(chatId).emit('message', messageData);
+      } else {
+        // If no chatId is provided (shouldn't happen), fall back to direct messaging
+        io.to(receiverId).emit('message', messageData);
+      }
+      
+      // Send acknowledgment to the sender with both IDs
+      if (tempMessageId) {
+        io.to(socket.id).emit(`message_ack_${tempMessageId}`, {
+          ...messageData,
+          tempMessageId,
+          status: 'delivered'
+        });
+      }
+      
+      console.log('Message saved and emitted:', {
+        tempMessageId,
+        serverId: messageObj._id,
+        chatId,
+        senderId,
+        timestamp: new Date(messageObj.timestamp).toISOString()
       });
-      
-      // Also emit to the sender and receiver for real-time updates in their chat lists
-      io.to(senderId).emit('message', messageObj);
-      io.to(receiverId).emit('message', messageObj);
-      
-      console.log('Message saved and emitted:', messageObj);
     } catch (error) {
       console.error('Error handling message:', error);
     }

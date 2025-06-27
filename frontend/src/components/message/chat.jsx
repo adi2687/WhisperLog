@@ -73,8 +73,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               delete newTyping[data.userId];
               return newTyping;
             });
-            setIsTyping(false);
-            
+            setIsTyping(false)
           }, 3000);
         }
       };
@@ -293,6 +292,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       }
 
       console.log('Upload successful:', responseData);
+      setSelectedVideo(null)
       return responseData;
       
     } catch (error) {
@@ -338,6 +338,28 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
 
     try {
       setIsUploading(true);
+      
+      // Create a temporary message ID for optimistic update
+      const tempMessageId = `temp-${Date.now()}`;
+      const tempMessage = {
+        _id: tempMessageId,
+        message: message.trim(),
+        senderId: user._id,
+        receiverId: receiver,
+        chatId: chatId,
+        imageUrl: selectedGif || null,
+        fileUrl: null,
+        fileName: null,
+        fileType: null,
+        fileSize: null,
+        status: 'sending',
+        createdAt: new Date().toISOString()
+      };
+
+      // Add the message to local state immediately
+      setChat(prev => [...prev, tempMessage]);
+      scrollToBottom(); // Scroll to show the new message
+
       let imageUrl = selectedGif || null;
       let fileData = null;
 
@@ -350,9 +372,6 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       else if (selectedVideo) {
         try {
           const result = await handleFileUpload(selectedVideo, 'video');
-          console.log('Video upload result:', result);
-          
-          // Handle Cloudinary response format
           const videoUrl = result.secure_url || result.url;
           const thumbnailUrl = result.thumbnail || 
                             (result.eager && result.eager[0]?.url) || 
@@ -371,8 +390,6 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             resource_type: result.resource_type,
             eager: result.eager
           };
-          
-          console.log('Processed video data:', fileData);
         } catch (error) {
           console.error('Error processing video upload:', error);
           throw new Error(`Failed to process video: ${error.message}`);
@@ -389,23 +406,57 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         };
       }
 
-      // Emit the message
-      socket.emit('message', {
-        chatId: chatId,
-        message: message.trim(),
-        senderId: user._id,
-        receiverId: receiver,
+      // Create the final message object
+      const finalMessage = {
+        ...tempMessage,
         imageUrl: imageUrl,
-        ...(fileData && fileData)
+        ...(fileData && fileData),
+        status: 'sent' // Update status
+      };
+
+      // Update the local state with the final message (including file data)
+      setChat(prev => 
+        prev.map(msg => 
+          msg._id === tempMessageId ? finalMessage : msg
+        )
+      );
+
+      // Emit the message via socket
+      socket.emit('message', {
+        ...finalMessage,
+        tempMessageId: tempMessageId // Include temp ID for reference
       });
 
-      // Clear the input and selected files/GIF
+      // Clear the input fields
       setMessage('');
       setSelectedImage(null);
       setSelectedFile(null);
       setSelectedGif(null);
+      setSelectedVideo(null);
+
+      // Update the message status when server acknowledges
+      const ackTimeout = setTimeout(() => {
+        setChat(prev => 
+          prev.map(msg => 
+            msg._id === tempMessageId && msg.status === 'sent'
+              ? { ...msg, status: 'delivered' }
+              : msg
+          )
+        );
+      }, 1000);
+
+      // Cleanup on component unmount
+      return () => clearTimeout(ackTimeout);
     } catch (error) {
       console.error('Error sending message:', error);
+      // Update message status to show error
+      setChat(prev => 
+        prev.map(msg => 
+          msg._id === tempMessageId 
+            ? { ...msg, status: 'error', error: error.message } 
+            : msg
+        )
+      );
       alert(error.message || 'Failed to send message');
     } finally {
       setIsUploading(false);
@@ -463,7 +514,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         senderId: msg.senderId || null,
         receiverId: msg.receiverId || null
       })) : [];
-      
+      setIsTyping(false);
       setChat(formattedMessages);
     };
     
@@ -477,20 +528,40 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   // Listen for new messages
   useEffect(() => {
     const handleNewMessage = (msg) => {
-      // Ensure the message has all required fields
-      const formattedMsg = {
-        ...msg,
-        fileUrl: msg.fileUrl || null,
-        fileName: msg.fileName || null,
-        fileType: msg.fileType || null,
-        fileSize: msg.fileSize || null,
-        imageUrl: msg.imageUrl || null,
-        createdAt: msg.createdAt || new Date().toISOString(),
-        senderId: msg.senderId || null,
-        receiverId: msg.receiverId || null
-      };
-      
-      setChat((prev) => [...prev, formattedMsg]);
+      setChat(prev => {
+        // Check if we already have this message (by ID or tempMessageId)
+        const messageExists = prev.some(m => 
+          m._id === msg._id || 
+          (msg.tempMessageId && m._id === msg.tempMessageId) ||
+          (m.tempMessageId && m.tempMessageId === msg._id)
+        );
+        
+        if (messageExists) {
+          // If message exists, update it with server data
+          return prev.map(m => 
+            (m._id === msg._id || m._id === msg.tempMessageId || m.tempMessageId === msg._id) 
+              ? { ...m, ...msg, _id: msg._id || m._id } // Ensure we keep the server ID
+              : m
+          );
+        }
+        
+        // If it's a new message, add it
+        const formattedMsg = {
+          ...msg,
+          fileUrl: msg.fileUrl || null,
+          fileName: msg.fileName || null,
+          fileType: msg.fileType || null,
+          fileSize: msg.fileSize || null,
+          imageUrl: msg.imageUrl || null,
+          createdAt: msg.createdAt || new Date().toISOString(),
+          senderId: msg.senderId || null,
+          receiverId: msg.receiverId || null,
+          // If this is a server message with a temp ID, update the ID
+          _id: msg._id || msg.tempMessageId || `temp-${Date.now()}`
+        };
+        
+        return [...prev, formattedMsg];
+      });
     };
 
     socket.on('message', handleNewMessage);
