@@ -27,8 +27,20 @@ const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration
-const allowedOrigins = [frontend, 'http://localhost:5173', 'https://whisperlog.vercel.app'];
+// CORS configuration - Update with your production domain
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://whisperlog.vercel.app',
+  'https://whisperlog.vercel.app/*',
+  'https://*.vercel.app',
+  'https://*.vercel.app/*'
+];
+
+// Add frontend URL if it's not already included
+if (frontend && !allowedOrigins.includes(frontend)) {
+  allowedOrigins.push(frontend);
+}
 
 // Enable CORS for all routes
 app.use((req, res, next) => {
@@ -112,12 +124,38 @@ app.use((req, res) => {
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, false);
+      
+      // Check if the origin is in the allowed list
+      if (allowedOrigins.some(allowedOrigin => 
+        origin === allowedOrigin || 
+        origin.startsWith(allowedOrigin.replace('*', ''))
+      )) {
+        return callback(null, true);
+      }
+      
+      console.log('Blocked CORS request from:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
   },
-  pingTimeout: 60000, // optional
-  pingInterval: 25000
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Enable WebSocket transport
+  transports: ['websocket', 'polling'],
+  // Handle WebSocket upgrade
+  allowUpgrades: true,
+  // Enable CORS for WebSocket
+  perMessageDeflate: {
+    threshold: 1024, // Size threshold in bytes for compression
+    zlibDeflateOptions: {
+      chunkSize: 16 * 1024
+    }
+  }
 });
 
 const chatMessages = {};

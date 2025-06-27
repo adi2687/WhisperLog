@@ -11,7 +11,10 @@ export const CallProvider = ({ children }) => {
 
   // Initialize socket connection
   useEffect(() => {
-    const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    // Use VITE_API_URL in production, fallback to current host in browser
+    const serverUrl = import.meta.env.VITE_API_URL || 
+                     `${window.location.protocol}//${window.location.host}`;
+    
     console.log('Connecting to socket server at:', serverUrl);
     
     const newSocket = io(serverUrl, {
@@ -21,6 +24,7 @@ export const CallProvider = ({ children }) => {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       withCredentials: true,
+      secure: window.location.protocol === 'https:',
       transports: ['websocket', 'polling']
     });
 
