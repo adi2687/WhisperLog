@@ -46,7 +46,6 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     if (receiver) setCurrentReceiver(receiver);
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
   }, [receiver, receiverDetails]);
-
   // Join the chat room and set up socket listeners
   useEffect(() => {
     if (chatId) {
@@ -822,7 +821,9 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
               </button>
             )}
             <div className="user-info">
+              {/* {currentReceiver.profilePicture ? (<p>yeah</p>) : (<p>no</p>)} */}
               <div className="avatar">
+                
                 <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
               </div>
               <div className='userdetails'>

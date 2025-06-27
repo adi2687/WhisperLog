@@ -23,7 +23,7 @@ export default function Contacts() {
         .then(res => res.json())
         .then(data => {
             if (data.friends) {
-                console.log('freidn s aya',data.friends)
+                // console.log('freidn s aya',data.friends)
                 setFriends(data.friends);
             }
         })
@@ -48,7 +48,7 @@ export default function Contacts() {
         }   )
         .then(res=>res.json())
         .then(data=>{
-            console.log(data,receiver)
+            // console.log(data,receiver)
             if (data.chatId){
                 navigate(`/chat/${data.chatId}`, { state: { receiver: receiverId,receiverUsername:receiver } });
             }

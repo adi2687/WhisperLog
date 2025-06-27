@@ -120,7 +120,7 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
-const chatMessages = {};
+const chatMessages = new Map();
 import messageModel from '../models/message.model.js'; 
 
 // Store active video call rooms and their participants
@@ -168,7 +168,10 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('message', async ({ chatId, message, senderId, receiverId, imageUrl, fileUrl, fileName, fileType, fileSize, tempMessageId, _id }) => {
+  socket.on('message', async ({ 
+    chatId, message, senderId, receiverId, imageUrl, 
+    fileUrl, fileName, fileType, fileSize, tempMessageId, _id 
+  }) => {
     try {
       console.log('New message received:', { 
         tempMessageId,
@@ -181,10 +184,13 @@ io.on('connection', (socket) => {
         hasFile: !!fileUrl,
         fileType: fileType || 'N/A'
       });
-      
-      // Create and save the message
-      const newMessage = new messageModel({
-        _id: _id?.startsWith('temp-') ? undefined : _id, // Use server-generated ID if not a temp ID
+  
+      if (!chatMessages.has(chatId)) {
+        chatMessages.set(chatId, []);
+      }
+  
+      const newMsg = {
+        _id: _id?.startsWith('temp-') ? undefined : _id,
         chatId,
         message: message || '',
         timestamp: Date.now(),
@@ -197,53 +203,65 @@ io.on('connection', (socket) => {
         fileType: fileType || null,
         fileSize: fileSize || null,
         status: 'delivered'
-      });
-      
-      const savedMessage = await newMessage.save();
-      
-      // Convert to plain object and remove any circular references
-      const messageObj = savedMessage.toObject();
-      
-      // Prepare the message data to be sent
-      const messageData = {
-        ...messageObj,
-        // Keep the original _id if this was a temporary message
-        _id: _id?.startsWith('temp-') ? _id : messageObj._id,
-        serverId: messageObj._id, // Always include the server-generated ID
-        status: 'delivered',
-        tempMessageId // Include the temporary ID for client-side reference
       };
-      
-      // Send the message to the chat room and the receiver's private room
-      // This ensures the message appears in both the chat and the receiver's notification system
-      // without causing duplicates
+  
+      chatMessages.get(chatId).push(newMsg);
+  
+      let messageData;
+  
+      if (chatMessages.get(chatId).length >= 10) {
+        const messagesToSave = chatMessages.get(chatId);
+  
+        const savedMessages = await messageModel.insertMany(
+          messagesToSave.map(msg => ({
+            ...msg,
+            _id: msg._id || undefined, // Ensure DB generates _id if temp
+          }))
+        );
+  
+        // Clear the buffer after saving
+        chatMessages.set(chatId, []);
+  
+        // Use the last saved message for broadcast/ack
+        const lastSaved = savedMessages[savedMessages.length - 1];
+        messageData = {
+          ...lastSaved.toObject(),
+          tempMessageId,
+          serverId: lastSaved._id,
+          status: 'delivered'
+        };
+  
+      } else {
+        // Message still in memory (not yet flushed to DB)
+        messageData = {
+          ...newMsg,
+          _id: _id || `temp-${Date.now()}`,
+          tempMessageId,
+          serverId: _id || null
+        };
+      }
+  
+      // Emit to room or user
       if (chatId) {
         io.to(chatId).emit('message', messageData);
       } else {
-        // If no chatId is provided (shouldn't happen), fall back to direct messaging
         io.to(receiverId).emit('message', messageData);
       }
-      
-      // Send acknowledgment to the sender with both IDs
+  
+      // Acknowledge to sender
       if (tempMessageId) {
         io.to(socket.id).emit(`message_ack_${tempMessageId}`, {
           ...messageData,
-          tempMessageId,
           status: 'delivered'
         });
       }
-      
-      console.log('Message saved and emitted:', {
-        tempMessageId,
-        serverId: messageObj._id,
-        chatId,
-        senderId,
-        timestamp: new Date(messageObj.timestamp).toISOString()
-      });
+  
     } catch (error) {
       console.error('Error handling message:', error);
     }
   });
+  
+  
 });
 
 

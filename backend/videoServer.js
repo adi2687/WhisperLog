@@ -1,84 +1,92 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
+const messageMap = new Map();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { 
-  cors: { 
-    origin: process.env.FRONTEND_URL || "*",
-    methods: ["GET", "POST"]
-  } 
-});
-
-const PORT = process.env.VIDEO_CALL_PORT || 3001;
-
-// Store active rooms and their participants
-const rooms = new Map();
-
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  socket.on("join-room", (roomId, userId) => {
-    // Create room if it doesn't exist
-    if (!rooms.has(roomId)) {
-      rooms.set(roomId, new Set());
+messageMap.set('a0cdbf32-5c64-465a-9d4d-aa8281755d8f', [
+    {
+      _id: undefined,
+      chatId: 'a0cdbf32-5c64-465a-9d4d-aa8281755d8f',
+      message: 'hey',
+      timestamp: 1751000965225,
+      senderId: '685d526edb73cd51f41cb25f',
+      receiverId: '685d5274db73cd51f41cb262',
+      isRead: false,
+      imageUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileSize: null,
+      status: 'delivered'
+    },
+    {
+      _id: undefined,
+      chatId: 'a0cdbf32-5c64-465a-9d4d-aa8281755d8f',
+      message: 'meopw',
+      timestamp: 1751000971115,
+      senderId: '685d526edb73cd51f41cb25f',
+      receiverId: '685d5274db73cd51f41cb262',
+      isRead: false,
+      imageUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileSize: null,
+      status: 'delivered'
+    },
+    {
+      _id: undefined,
+      chatId: 'a0cdbf32-5c64-465a-9d4d-aa8281755d8f',
+      message: 'mepw',
+      timestamp: 1751000971749,
+      senderId: '685d526edb73cd51f41cb25f',
+      receiverId: '685d5274db73cd51f41cb262',
+      isRead: false,
+      imageUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileSize: null,
+      status: 'delivered'
+    },
+    {
+      _id: undefined,
+      chatId: 'a0cdbf32-5c64-465a-9d4d-aa8281755d8f',
+      message: 'meow',
+      timestamp: 1751000972373,
+      senderId: '685d526edb73cd51f41cb25f',
+      receiverId: '685d5274db73cd51f41cb262',
+      isRead: false,
+      imageUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileSize: null,
+      status: 'delivered'
+    },
+    {
+      _id: undefined,
+      chatId: 'a0cdbf32-5c64-465a-9d4d-aa8281755d8f',
+      message: 'mewow',
+      timestamp: 1751000973067,
+      senderId: '685d526edb73cd51f41cb25f',
+      receiverId: '685d5274db73cd51f41cb262',
+      isRead: false,
+      imageUrl: null,
+      fileUrl: null,
+      fileName: null,
+      fileType: null,
+      fileSize: null,
+      status: 'delivered'
     }
-    
-    const room = rooms.get(roomId);
-    room.add(socket.id);
-    socket.join(roomId);
-    
-    // Notify other users in the room about new user
-    socket.to(roomId).emit("user-connected", { userId: socket.id });
-    
-    // Send list of existing users to the new user
-    const usersInRoom = Array.from(room).filter(id => id !== socket.id);
-    socket.emit("existing-users", usersInRoom);
-  });
+  ]
+);
+let totalMessages = 0;
 
-  // WebRTC signaling
-  socket.on("offer", (data) => {
-    socket.to(data.target).emit("offer", {
-      offer: data.offer,
-      sender: socket.id
-    });
-  });
+for (const [roomId, messages] of messageMap) {
+  console.log(`${roomId}: ${messages.length} messages`);
+  for (let j=0 ; j<messages.length ; j++) {
+    console.log(messages[j].message);
+  }
+  // totalMessages += messages.length;
+}
 
-  socket.on("answer", (data) => {
-    socket.to(data.target).emit("answer", {
-      answer: data.answer,
-      sender: socket.id
-    });
-  });
-
-  socket.on("ice-candidate", (data) => {
-    socket.to(data.target).emit("ice-candidate", {
-      candidate: data.candidate,
-      sender: socket.id
-    });
-  });
-
-  socket.on("disconnect", () => {
-    // Find and clean up rooms
-    for (const [roomId, users] of rooms.entries()) {
-      if (users.has(socket.id)) {
-        users.delete(socket.id);
-        socket.to(roomId).emit("user-disconnected", { userId: socket.id });
-        
-        // Clean up empty rooms
-        if (users.size === 0) {
-          rooms.delete(roomId);
-        }
-        break;
-      }
-    }
-    console.log("User disconnected:", socket.id);
-  });
-});
-
-server.listen(PORT, () => {
-  console.log(`Video call server running on port ${PORT}`);
-});
-
-module.exports = { app, server };
+// console.log(`Total messages: ${totalMessages}`); 
+// console.log(messageMap)
