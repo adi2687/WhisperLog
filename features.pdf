@@ -1,0 +1,60 @@
+# WhisperLog Features Overview
+
+## 1. Messaging Features
+- Real-time text messaging
+- Typing indicators
+- Voice messages
+- GIF sharing
+- Image sharing
+- File sharing
+- Video sharing
+
+## 2. User Management
+- User registration
+- Login/Logout
+- Profile management
+- Friend search
+- Friend requests
+- Friend management
+
+## 3. Real-time Features
+- Real-time chat using Socket.IO
+- Video calling capability
+- Typing indicators
+- Online status
+- Message delivery status
+
+## 4. Media Features
+- Image sharing with preview
+- File sharing with progress
+- GIF picker integration
+- Voice message recording
+- Video call functionality
+
+## 5. UI/UX Features
+- Modern chat interface
+- Profile cards
+- Message history
+- Message loading
+- Responsive design
+- Message formatting
+- Emoji support
+
+## 6. Security Features
+- Secure authentication
+- Cookie-based session
+- CORS protection
+- File upload validation
+- Input sanitization
+
+## 7. Notifications
+- Real-time notifications
+- Friend requests
+- New messages
+- Status updates
+
+## 8. Performance
+- Message buffering
+- Efficient file handling
+- Optimized image compression
+- Real-time updates
