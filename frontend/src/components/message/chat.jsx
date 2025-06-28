@@ -465,65 +465,50 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   // Load existing messages when chatId changes
   useEffect(() => {
     if (!chatId) return;
-    
+  
     // Join the chat room
     socket.emit('joinchat', { chatId });
-    
-    // Fetch initial messages
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/message/${chatId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const data = await response.json();
-        
-        // Ensure all messages have required fields
-        const formattedMessages = (data.messages || []).map(msg => ({
-          ...msg,
-          fileUrl: msg.fileUrl || null,
-          fileName: msg.fileName || null,
-          fileType: msg.fileType || null,
-          fileSize: msg.fileSize || null,
-          imageUrl: msg.imageUrl || null,
-          createdAt: msg.createdAt || new Date().toISOString(),
-          senderId: msg.senderId || null,
-          receiverId: msg.receiverId || null
-        }));
-        
-        setChat(formattedMessages);
-      } catch (error) {
-        console.error('Error loading messages:', error);
-      }
-    };
-    
-    fetchMessages();
-    
+  
+
+  
     // Handle incoming messages from socket
     const handleLoadMessages = (msgs) => {
-      const formattedMessages = Array.isArray(msgs) ? msgs.map(msg => ({
-        ...msg,
-        fileUrl: msg.fileUrl || null,
-        fileName: msg.fileName || null,
-        fileType: msg.fileType || null,
-        fileSize: msg.fileSize || null,
-        imageUrl: msg.imageUrl || null,
-        createdAt: msg.createdAt || new Date().toISOString(),
-        senderId: msg.senderId || null,
-        receiverId: msg.receiverId || null
-      })) : [];
+      console.log('loading messages', msgs);
+      const formattedMessages = Array.isArray(msgs)
+        ? msgs.map(msg => ({
+            ...msg,
+            fileUrl: msg.fileUrl || null,
+            fileName: msg.fileName || null,
+            fileType: msg.fileType || null,
+            fileSize: msg.fileSize || null,
+            imageUrl: msg.imageUrl || null,
+            createdAt: msg.createdAt || new Date().toISOString(),
+            timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : msg.timestamp || Date.parse(msg.createdAt || new Date()),
+            senderId: msg.senderId || null,
+            receiverId: msg.receiverId || null
+          }))
+        : [];
+          
       setIsTyping(false);
-      setChat(formattedMessages);
-    };
+  
+      setChat(prev => {
+        const filteredPrev = prev.filter(msg => !String(msg.id).startsWith('temp-'));
+        
+        // Optional deduplication by real IDs:
+        const existingIds = new Set(filteredPrev.map(m => m.id));
+        const newMessages = formattedMessages.filter(m => !existingIds.has(m.id));
     
+        return [...filteredPrev, ...newMessages];
+      });
+    }
+  
     socket.on('loadMessages', handleLoadMessages);
-    
+  
     return () => {
       socket.off('loadMessages', handleLoadMessages);
     };
   }, [chatId]);
-
+  
   // Listen for new messages
   useEffect(() => {
     const handleNewMessage = (msg) => {
@@ -869,7 +854,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           {chat.length > 0 ? (
             chat.map((msg, index) => (
               <div
-                key={index}
+              key={msg._id || `${msg.chatId}-${msg.createdAt}`}
+
                 className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
               >
                 <div className='message-main'>

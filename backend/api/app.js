@@ -121,7 +121,61 @@ const io = new Server(server, {
 });
 
 const chatMessages = new Map();
-import messageModel from '../models/message.model.js'; 
+import messageModel from '../models/message.model.js';
+
+// Function to flush messages for a specific chat to the database
+const flushBuffer = async (chatId) => {
+  if (!chatMessages.has(chatId) || chatMessages.get(chatId).length === 0) {
+    return;
+  }
+
+  try {
+    const messagesToSave = [...chatMessages.get(chatId)];
+    if (messagesToSave.length === 0) return;
+
+    // Save messages to database
+    const savedMessages = await messageModel.insertMany(
+      messagesToSave.map(msg => ({
+        ...msg,
+        _id: msg._id || undefined, // Let MongoDB generate _id if it's a temp ID
+      }))
+    );
+
+    // Clear the buffer after saving
+    chatMessages.set(chatId, []);
+
+    console.log(`Flushed ${savedMessages.length} messages to database for chat ${chatId}`);
+    return savedMessages;
+  } catch (error) {
+    console.error(`Error flushing messages for chat ${chatId}:`, error);
+    // Optionally, you could implement retry logic here
+    throw error;
+  }
+};
+
+// Set up periodic flush (every 15 seconds)
+const FLUSH_INTERVAL_MS = 60000;
+const flushInterval = setInterval(() => {
+  console.log('Running periodic message flush...');
+  for (const [chatId, messages] of chatMessages.entries()) {
+    if (messages.length > 0) {
+      flushBuffer(chatId).catch(error => {
+        console.error(`Error in periodic flush for chat ${chatId}:`, error);
+      });
+    }
+  }
+}, FLUSH_INTERVAL_MS);
+
+// Clean up interval on server shutdown
+process.on('SIGINT', () => {
+  clearInterval(flushInterval);
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  clearInterval(flushInterval);
+  process.exit(0);
+}); 
 
 // Store active video call rooms and their participants
 
@@ -140,7 +194,7 @@ io.on('connection', (socket) => {
         console.warn('Invalid typing event data:', data);
         return;
       }
-      console.log('in typing')
+      // console.log('in typing')
       // Broadcast to all in the chat room except the sender
       socket.to(data.chatId).emit('typing', {
         chatId: data.chatId,
@@ -148,7 +202,7 @@ io.on('connection', (socket) => {
         username: data.username
       });
       
-      console.log(`User ${data.userId} is typing in chat ${data.chatId}`);
+      // console.log(`User ${data.userId} is typing in chat ${data.chatId}`);
     } catch (error) {
       console.error('Error handling typing event:', error);
     }
@@ -157,33 +211,56 @@ io.on('connection', (socket) => {
   socket.on('joinchat', async ({ chatId }) => {
     if (!chatId) return;
     socket.join(chatId);
-    // console.log('joined chat', chatId);
-
-    // Send existing messages to the new client
+  
     try {
-      const messages = await messageModel.find({ chatId }).lean();
-      socket.emit('loadMessages', messages);
+      const dbmessages = await messageModel.find({ chatId }).lean();
+      const buffermessage = chatMessages.get(chatId) || [];
+  
+      const allmessages = [...dbmessages, ...buffermessage].map(msg => ({
+        _id: msg._id || `temp-${Date.now()}-${Math.random()}`,
+        chatId: msg.chatId,
+        senderId: msg.senderId,
+        receiverId: msg.receiverId,
+        message: msg.message || '',
+        isRead: msg.isRead ?? false,
+        timestamp: msg.timestamp || Date.now(),
+        imageUrl: msg.imageUrl || null,
+        fileUrl: msg.fileUrl || null,
+        fileName: msg.fileName || null,
+        fileType: msg.fileType || null,
+        fileSize: msg.fileSize || null,
+        status: msg.status || 'sent',
+        createdAt: msg.createdAt || new Date(msg.timestamp || Date.now()),
+        updatedAt: msg.updatedAt || new Date(msg.timestamp || Date.now()),
+      }));
+  
+      // Optional: sort by createdAt
+      allmessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  
+      socket.emit('loadMessages', allmessages);
+      console.log('loading messages', allmessages.length);
     } catch (error) {
       console.error('Error loading messages:', error);
     }
   });
+  
 
   socket.on('message', async ({ 
     chatId, message, senderId, receiverId, imageUrl, 
     fileUrl, fileName, fileType, fileSize, tempMessageId, _id 
   }) => {
     try {
-      console.log('New message received:', { 
-        tempMessageId,
-        _id,
-        chatId, 
-        senderId, 
-        receiverId, 
-        message: message ? `${message.substring(0, 30)}${message.length > 30 ? '...' : ''}` : 'No text',
-        hasImage: !!imageUrl,
-        hasFile: !!fileUrl,
-        fileType: fileType || 'N/A'
-      });
+      // console.log('New message received:', { 
+      //   tempMessageId,
+      //   _id,
+      //   chatId, 
+      //   senderId, 
+      //   receiverId, 
+      //   message: message ? `${message.substring(0, 30)}${message.length > 30 ? '...' : ''}` : 'No text',
+      //   hasImage: !!imageUrl,
+      //   hasFile: !!fileUrl,
+      //   fileType: fileType || 'N/A'
+      // });
   
       if (!chatMessages.has(chatId)) {
         chatMessages.set(chatId, []);
@@ -208,7 +285,7 @@ io.on('connection', (socket) => {
       chatMessages.get(chatId).push(newMsg);
   
       let messageData;
-  
+  // limit of 10 messaegs per chat 
       if (chatMessages.get(chatId).length >= 10) {
         const messagesToSave = chatMessages.get(chatId);
   
@@ -237,27 +314,28 @@ io.on('connection', (socket) => {
           ...newMsg,
           _id: _id || `temp-${Date.now()}`,
           tempMessageId,
-          serverId: _id || null
+          serverId: null, // not yet stored in DB
+          status: 'buffered'
         };
       }
   
-      // Emit to room or user
-      if (chatId) {
-        io.to(chatId).emit('message', messageData);
-      } else {
-        io.to(receiverId).emit('message', messageData);
-      }
-  
-      // Acknowledge to sender
+      // Emit message to all clients in the chat room
+      io.to(chatId).emit('message', messageData);
+
+      // Acknowledge to sender with current status
       if (tempMessageId) {
-        io.to(socket.id).emit(`message_ack_${tempMessageId}`, {
-          ...messageData,
-          status: 'delivered'
-        });
+        io.to(socket.id).emit(`message_ack_${tempMessageId}`, messageData);
       }
   
     } catch (error) {
       console.error('Error handling message:', error);
+      // Notify sender of the error
+      if (tempMessageId) {
+        io.to(socket.id).emit('messageError', {
+          tempMessageId,
+          message: 'Message could not be processed'
+        });
+      }
     }
   });
   

@@ -21,6 +21,7 @@
     "express-session": "^1.18.1",
     "http": "^0.0.1-security",
     "jsonwebtoken": "^9.0.2",
+    "lz-string": "^1.5.0",
     "mongoose": "^8.16.0",
     "multer": "^2.0.1",
     "multer-storage-cloudinary": "^4.0.0",
@@ -30,6 +31,8 @@
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
     "path": "^0.12.7",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
   }
 }
