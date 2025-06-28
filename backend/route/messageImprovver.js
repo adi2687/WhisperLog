@@ -2,21 +2,20 @@ import express from "express";
 const router = express.Router();
 
 import dotenv from "dotenv";
-dotenv.config({path:'../.env'});
+dotenv.config();
+router.use(express.json());
 
-const API_KEY = process.env.OPENAI_API_KEY; 
+const API_KEY = "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"; 
 const BASE_URL = "https://openrouter.ai/api/v1";
-
-
 
 router.post("/spell_correct", async (req, res) => {
   const { sentence } = req.body;
-console.log(req.body)
+  console.log(sentence)
   if (!sentence) {
     return res.status(400).json({ error: "Missing 'sentence' in request body" });
   }
 
-  const prompt = `Correct the following sentence for any grammar or spelling mistakes: ${sentence} no need to add any extra words or sentences`;
+  const prompt = `Correct the following sentence for any grammar or spelling mistakes: ${sentence} dont add any extra words or sentences just giev the correct sentence`;
 
   try {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
@@ -37,7 +36,7 @@ console.log(req.body)
     });
 
     const data = await response.json();
-    console.log(data)
+
     const corrected = data.choices?.[0]?.message?.content;
     console.log(corrected)
     res.json({ corrected_sentence:corrected });
