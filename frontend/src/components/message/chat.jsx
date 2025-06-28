@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
 import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic } from 'react-icons/fi';
+import { FaMagic, FaSpinner } from 'react-icons/fa';
+
 import { format } from 'date-fns';
 import './chat.css';
 import './GifPicker.css';
@@ -785,6 +787,28 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   };
 
+const [correcting,iscorrecting]=useState(false)
+  const handleCorrectMessage = async () => {
+    if (!message.trim()) {
+      setMessage('Please enter a message to correct');
+      setTimeout(() => setMessage(''), 1000);
+      return;
+    }
+    iscorrecting(true)
+    const backendurl=import.meta.env.VITE_BACKEND_URL
+    const response = await fetch(`${backendurl}/messageImprover/spell_correct`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sentence: message }),
+    });
+    const data = await response.json();
+    console.log(data)
+    setMessage(data.corrected_sentence);
+    iscorrecting(false)
+  };
+  
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
       <div style={{ 
@@ -1052,7 +1076,22 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
             className="chat-input"
             disabled={isUploading}
           />
-          
+          <button 
+            onClick={handleCorrectMessage} 
+            className={`correct-btn ${correcting ? 'correcting' : ''}`}
+            disabled={isUploading || correcting}
+            title="Improve your message with AI"
+          >
+            {correcting ? (
+              <>
+                <FaSpinner className="spinner" />
+              </>
+            ) : (
+              <>
+              <i class="fa fa-magic" aria-hidden="true"></i>
+              </>
+            )}
+          </button>
           <div className="voice-input-container">
             {isListening && (
               <div className="recording-indicator">
