@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
 import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic } from 'react-icons/fi';
@@ -15,16 +15,22 @@ import Aurora from '../../pages/Aurora'
 
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
-export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
+export default function Message({ receiverDetails, onBack }) {
+  // State variables and hooks
   const location = useLocation();
-  // Use props if available, otherwise fall back to location state
+  const { id: chatId } = useParams();
+  const { profile } = useProfileCurrentUser();
+  const user = profile;
+  const [view, setView] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
+  const [receiver, setReceiver] = useState(location.state?.receiver || '');
+  const [receiverUsername, setReceiverUsername] = useState(location.state?.receiverUsername || '');
   const [currentReceiver, setCurrentReceiver] = useState(receiver || location.state?.receiver);
   const [currentReceiverDetails, setCurrentReceiverDetails] = useState(receiverDetails || location.state?.receiverUsername);
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
-  const typingTimeout = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -35,25 +41,24 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const [gifs, setGifs] = useState([]);
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const user = useProfileCurrentUser().profile;
   const inputRef = useRef(null);
-  // Track last typing emission time
+  const typingTimeout = useRef(null);
+  const recognitionRef = useRef(null);
   const lastTypingTime = useRef(0);
-  const typingDebounce = useRef(null);
-  const fileInputRef = useRef(null);
+
   // Update receiver if props or location changes
   useEffect(() => {
     if (receiver) setCurrentReceiver(receiver);
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
   }, [receiver, receiverDetails]);
+
   // Join the chat room and set up socket listeners
   useEffect(() => {
     if (chatId) {
       console.log('Joining chat:', chatId);
       socket.emit('join_room', { roomId: chatId, userId: user?._id });
-      
+
       // Listen for typing events
       const handleTyping = (data) => {
         console.log('Received typing event:', data);
@@ -67,7 +72,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           if (typingTimeout.current) {
             clearTimeout(typingTimeout.current);
           }
-          
+
           typingTimeout.current = setTimeout(() => {
             setTypingUsers(prev => {
               const newTyping = {...prev};
@@ -81,7 +86,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
 
       // Add the event listener
       socket.on('typing', handleTyping);
-      
+
       // Clean up event listeners
       return () => {
         socket.off('typing', handleTyping);
@@ -92,7 +97,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   }, [chatId, user?._id]);
 
-  // Handle file selection
+  // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -121,29 +126,29 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         alert('Video file is too large. Maximum size is 50MB.');
         return;
       }
-      
+
       // Check file type
       const validTypes = [
-        'video/mp4', 'video/webm', 'video/quicktime', 
-        'video/x-msvideo', 'video/x-ms-wmv', 'video/3gpp', 
+        'video/mp4', 'video/webm', 'video/quicktime',
+        'video/x-msvideo', 'video/x-ms-wmv', 'video/3gpp',
         'video/3gpp2', 'video/mpeg', 'video/mp2t', 'video/x-flv',
         'video/x-m4v', 'video/x-matroska', 'video/x-ms-asf'
       ];
-      
+
       const fileType = file.type.toLowerCase();
       const isValidType = validTypes.some(type => fileType.includes(type.replace('video/', '')));
-      
+
       if (!isValidType) {
         alert('Unsupported video format. Supported formats: MP4, WebM, QuickTime, AVI, WMV, 3GPP, MPEG, FLV, MKV, etc.');
         return;
       }
-      
+
       setSelectedVideo(file);
       setSelectedImage(null);
       setSelectedFile(null);
       setSelectedGif(null);
       setMessage('');
-      
+
       // Reset the file input to allow selecting the same file again
       e.target.value = null;
     }
@@ -189,17 +194,17 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
 
   // Get file icon based on file type
   const getFileIcon = (fileType) => {
-    if (!fileType) return '📄';
-    
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('word') || fileType.includes('document')) return '📝';
-    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '📊';
-    if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '📑';
-    if (fileType.includes('zip') || fileType.includes('compressed')) return '🗜️';
-    if (fileType.includes('text/plain')) return '📄';
-    if (fileType.includes('image/')) return '🖼️';
-    
-    return '📎';
+    if (!fileType) return '';
+
+    if (fileType.includes('pdf')) return '';
+    if (fileType.includes('word') || fileType.includes('document')) return '';
+    if (fileType.includes('excel') || fileType.includes('spreadsheet')) return '';
+    if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '';
+    if (fileType.includes('zip') || fileType.includes('compressed')) return '';
+    if (fileType.includes('text/plain')) return '';
+    if (fileType.includes('image/')) return '';
+
+    return '';
   };
 
   const handleFileUpload = async (file, type = 'file') => {
@@ -207,7 +212,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       const uploadFormData = new FormData();
       let endpoint = 'upload-file';
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'; // Fallback URL
-      
+
       // Add file to form data based on type
       if (type === 'image') {
         if (typeof file === 'string') {
@@ -257,7 +262,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       // Get response as text first
       const responseText = await response.text();
       console.log(`[${response.status}] Response:`, responseText);
-      
+
       // Try to parse as JSON
       let responseData;
       try {
@@ -269,33 +274,33 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           headers: Object.fromEntries(response.headers.entries()),
           body: responseText
         });
-        
+
         if (responseText.trim().startsWith('<!DOCTYPE')) {
           throw new Error('Server returned an HTML error page. The server might be misconfigured.');
         }
-        
+
         throw new Error(`Invalid server response (${response.status} ${response.statusText}). Please try again.`);
       }
 
       // Handle non-OK responses
       if (!response.ok) {
-        const errorMessage = responseData.message || 
-                          responseData.error || 
-                          `Server returned ${response.status} ${response.statusText}`;
-        
+        const errorMessage = responseData.message ||
+          responseData.error ||
+          `Server returned ${response.status} ${response.statusText}`;
+
         console.error('Upload failed:', {
           status: response.status,
           error: errorMessage,
           response: responseData
         });
-        
+
         throw new Error(errorMessage);
       }
 
       console.log('Upload successful:', responseData);
       setSelectedVideo(null)
       return responseData;
-      
+
     } catch (error) {
       console.error(`Error in handleFileUpload (${type}):`, error);
       if (!error.message) {
@@ -326,7 +331,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     setSelectedImage(null);
     setSelectedFile(null);
     setShowGifPicker(false);
-    
+
     // Auto-focus the message input after selecting a GIF
     if (inputRef.current) {
       inputRef.current.focus();
@@ -339,7 +344,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
 
     try {
       setIsUploading(true);
-      
+
       // Create a temporary message ID for optimistic update
       const tempMessageId = `temp-${Date.now()}`;
       const tempMessage = {
@@ -368,19 +373,19 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       if (selectedImage) {
         const result = await handleFileUpload(selectedImage, 'image');
         imageUrl = result.imageUrl || result.url;
-      } 
+      }
       // Handle video upload if exists
       else if (selectedVideo) {
         try {
           const result = await handleFileUpload(selectedVideo, 'video');
           const videoUrl = result.secure_url || result.url;
-          const thumbnailUrl = result.thumbnail || 
-                            (result.eager && result.eager[0]?.url) || 
-                            (result.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${result.public_id}.jpg`);
-          
-          fileData = { 
-            fileUrl: videoUrl, 
-            fileName: result.originalname || selectedVideo.name, 
+          const thumbnailUrl = result.thumbnail ||
+            (result.eager && result.eager[0]?.url) ||
+            (result.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${result.public_id}.jpg`);
+
+          fileData = {
+            fileUrl: videoUrl,
+            fileName: result.originalname || selectedVideo.name,
             fileType: result.resource_type === 'video' ? 'video' : (result.format ? `video/${result.format}` : 'video/mp4'),
             thumbnail: thumbnailUrl,
             duration: result.duration,
@@ -416,8 +421,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       };
 
       // Update the local state with the final message (including file data)
-      setChat(prev => 
-        prev.map(msg => 
+      setChat(prev =>
+        prev.map(msg =>
           msg._id === tempMessageId ? finalMessage : msg
         )
       );
@@ -437,8 +442,8 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
 
       // Update the message status when server acknowledges
       const ackTimeout = setTimeout(() => {
-        setChat(prev => 
-          prev.map(msg => 
+        setChat(prev =>
+          prev.map(msg =>
             msg._id === tempMessageId && msg.status === 'sent'
               ? { ...msg, status: 'delivered' }
               : msg
@@ -451,10 +456,10 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     } catch (error) {
       console.error('Error sending message:', error);
       // Update message status to show error
-      setChat(prev => 
-        prev.map(msg => 
-          msg._id === tempMessageId 
-            ? { ...msg, status: 'error', error: error.message } 
+      setChat(prev =>
+        prev.map(msg =>
+          msg._id === tempMessageId
+            ? { ...msg, status: 'error', error: error.message }
             : msg
         )
       );
@@ -467,70 +472,66 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   // Load existing messages when chatId changes
   useEffect(() => {
     if (!chatId) return;
-  
+
     // Join the chat room
     socket.emit('joinchat', { chatId });
-  
 
-  
     // Handle incoming messages from socket
     const handleLoadMessages = (msgs) => {
       console.log('loading messages', msgs);
       const formattedMessages = Array.isArray(msgs)
         ? msgs.map(msg => ({
-            ...msg,
-            fileUrl: msg.fileUrl || null,
-            fileName: msg.fileName || null,
-            fileType: msg.fileType || null,
-            fileSize: msg.fileSize || null,
-            imageUrl: msg.imageUrl || null,
-            createdAt: msg.createdAt || new Date().toISOString(),
-            timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : msg.timestamp || Date.parse(msg.createdAt || new Date()),
-            senderId: msg.senderId || null,
-            receiverId: msg.receiverId || null
-          }))
+          ...msg,
+          fileUrl: msg.fileUrl || null,
+          fileName: msg.fileName || null,
+          fileType: msg.fileType || null,
+          fileSize: msg.fileSize || null,
+          imageUrl: msg.imageUrl || null,
+          createdAt: msg.createdAt || new Date().toISOString(),
+          timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp).getTime() : msg.timestamp || Date.parse(msg.createdAt || new Date()),
+          senderId: msg.senderId || null,
+          receiverId: msg.receiverId || null
+        }))
         : [];
-          
       setIsTyping(false);
-  
+
       setChat(prev => {
-        const filteredPrev = prev.filter(msg => !String(msg.id).startsWith('temp-'));
-        
+        const filteredPrev = prev.filter(msg => !String(msg._id).startsWith('temp-'));
+
         // Optional deduplication by real IDs:
-        const existingIds = new Set(filteredPrev.map(m => m.id));
+        const existingIds = new Set(filteredPrev.map(m => m._id));
         const newMessages = formattedMessages.filter(m => !existingIds.has(m.id));
-    
+
         return [...filteredPrev, ...newMessages];
       });
     }
-  
     socket.on('loadMessages', handleLoadMessages);
-  
+
     return () => {
       socket.off('loadMessages', handleLoadMessages);
     };
   }, [chatId]);
-  
+
   // Listen for new messages
   useEffect(() => {
     const handleNewMessage = (msg) => {
       setChat(prev => {
         // Check if we already have this message (by ID or tempMessageId)
-        const messageExists = prev.some(m => 
-          m._id === msg._id || 
+        const messageExists = prev.some(m =>
+          m._id === msg._id ||
           (msg.tempMessageId && m._id === msg.tempMessageId) ||
           (m.tempMessageId && m.tempMessageId === msg._id)
         );
-        
+
         if (messageExists) {
           // If message exists, update it with server data
-          return prev.map(m => 
-            (m._id === msg._id || m._id === msg.tempMessageId || m.tempMessageId === msg._id) 
+          return prev.map(m =>
+            (m._id === msg._id || m._id === msg.tempMessageId || m.tempMessageId === msg._id)
               ? { ...m, ...msg, _id: msg._id || m._id } // Ensure we keep the server ID
               : m
           );
         }
-        
+
         // If it's a new message, add it
         const formattedMsg = {
           ...msg,
@@ -545,7 +546,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           // If this is a server message with a temp ID, update the ID
           _id: msg._id || msg.tempMessageId || `temp-${Date.now()}`
         };
-        
+
         return [...prev, formattedMsg];
       });
     };
@@ -572,22 +573,22 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   };
 
-  // Track if profile card is visible
-  const [view, setView] = useState(false)
 
+  
+  // Reset profile card visibility when chat changes
   useEffect(() => {
-    setView(false)
-  }, [chatId])
+    setView(false);
+  }, [chatId]);
 
   // Render message content based on type
   const renderMessageContent = (msg) => {
     if (msg.imageUrl) {
       return (
         <div className="message-image">
-          <img 
-            src={msg.imageUrl} 
-            alt="Shared content" 
-            className="chat-image" 
+          <img
+            src={msg.imageUrl}
+            alt="Shared content"
+            className="chat-image"
             onClick={() => window.open(msg.imageUrl, '_blank')}
           />
           {msg.message && <div className="image-caption">{msg.message}</div>}
@@ -595,22 +596,21 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       );
     } else if (msg.fileUrl) {
       // Check if it's a video
-      if ((msg.fileType && (msg.fileType.startsWith('video/') || msg.fileType === 'video')) || 
-          (msg.fileUrl && msg.fileUrl.match(/\.(mp4|webm|mov|avi|wmv|flv|mkv|3gp|mpeg|mpg|m4v|ogv)($|\?)/i))) {
-        
+      if ((msg.fileType && (msg.fileType.startsWith('video/') || msg.fileType === 'video')) ||
+        (msg.fileUrl && msg.fileUrl.match(/\.(mp4|webm|mov|avi|wmv|flv|mkv|3gp|mpeg|mpg|m4v|ogv)($|\?)/i))) {
+
         // Ensure the URL is properly formatted
-        const videoUrl = msg.fileUrl?.startsWith('http') ? msg.fileUrl : 
-                         msg.fileUrl?.startsWith('//') ? `https:${msg.fileUrl}` : 
-                         msg.fileUrl;
-        
+        const videoUrl = msg.fileUrl?.startsWith('http') ? msg.fileUrl :
+          msg.fileUrl?.startsWith('//') ? `https:${msg.fileUrl}` : msg.fileUrl;
+
         // Get thumbnail if available
-        const thumbnailUrl = msg.thumbnail || 
-                           (msg.eager && msg.eager[0]?.url) || 
-                           (msg.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${msg.public_id}.jpg`);
-        
+        const thumbnailUrl = msg.thumbnail ||
+          (msg.eager && msg.eager[0]?.url) ||
+          (msg.public_id && `https://res.cloudinary.com/${process.env.VITE_CLOUDINARY_CLOUD_NAME}/video/upload/c_thumb,w_300,h_300/${msg.public_id}.jpg`);
+
         return (
           <div className="message-video">
-            <video 
+            <video
               className="chat-video"
               controls
               controlsList="nodownload"
@@ -623,7 +623,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
                 errorMsg.className = 'video-error';
                 errorMsg.textContent = 'Error loading video. Click to open in new tab.';
                 e.target.parentNode.appendChild(errorMsg);
-                
+
                 // Make the video container clickable to open the video in a new tab
                 e.target.parentNode.style.cursor = 'pointer';
                 e.target.parentNode.onclick = () => window.open(videoUrl, '_blank');
@@ -636,7 +636,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
           </div>
         );
       }
-      
+
       // Regular file download
       return (
         <div className="message-file" onClick={() => window.open(msg.fileUrl, '_blank')}>
@@ -652,13 +652,13 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         </div>
       );
     }
-    return msg.message ? <p style={{color:"white",fontFamily:"Inter",fontSize:"14px"}}>{msg.message}</p> : null;
+    return msg.message ? <p style={{ color: "white", fontFamily: "Inter", fontSize: "14px" }}>{msg.message}</p> : null;
   };
 
   // Initialize speech recognition on component mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       console.warn('Speech recognition not supported in this browser');
@@ -668,7 +668,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     // Initialize recognition
     recognitionRef.current = new SpeechRecognition();
     const recognition = recognitionRef.current;
-    
+
     // Configure recognition
     recognition.continuous = false;  // Get single result per recognition
     recognition.interimResults = false;  // We only want final results
@@ -724,7 +724,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       console.error('Speech recognition not initialized');
       return;
     }
-    
+
     if (isListening) {
       // Stop listening
       try {
@@ -745,7 +745,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
       } catch (error) {
         console.error('Error starting voice recognition:', error);
         setIsListening(false);
-        
+
         // Try to reinitialize if there was an error
         if (error.message.includes('already started')) {
           console.log('Attempting to reinitialize speech recognition');
@@ -763,12 +763,12 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
   const handleMessageChange = (e) => {
     const newMessage = e.target.value;
     setMessage(newMessage);
-    
+
     // Clear any existing timeout
     if (typingDebounce.current) {
       clearTimeout(typingDebounce.current);
     }
-    
+
     // If there's a message, emit typing event
     if (newMessage.trim()) {
       const now = Date.now();
@@ -777,7 +777,7 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
         socket.emit('typing', { chatId: chatId, userId: user?._id });
         lastTypingTime.current = now;
       }
-      
+
       // Set up debounce for stopping typing indicator
       typingDebounce.current = setTimeout(() => {
         socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
@@ -787,36 +787,47 @@ export default function Chat({ chatId, receiver, receiverDetails, onBack }) {
     }
   };
 
-const [correcting,iscorrecting]=useState(false)
   const handleCorrectMessage = async () => {
     if (!message.trim()) {
       setMessage('Please enter a message to correct');
       setTimeout(() => setMessage(''), 1000);
       return;
     }
-    iscorrecting(true)
-    const backendurl=import.meta.env.VITE_BACKEND_URL
-    const response = await fetch(`${backendurl}/messageImprover/spell_correct`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ sentence: message }),
-    });
-    const data = await response.json();
-    console.log(data)
-    setMessage(data.corrected_sentence);
-    iscorrecting(false)
+
+    setCorrecting(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/messageImprover/spell_correct`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sentence: message }),
+      });
+
+      const data = await response.json();
+      console.log('Corrected sentence:', data);
+
+      if (data.corrected_sentence) {
+        setMessage(data.corrected_sentence);
+      } else {
+        setMessage('');
+      }
+    } catch (error) {
+      console.error('Error correcting message:', error);
+      setMessage('Error correcting message');
+    } finally {
+      setCorrecting(false);
+    }
   };
-  
+
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
-      <div style={{ 
-        position: 'relative', 
-        zIndex: 1, 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column' 
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {currentReceiverDetails && (
           <div className="chat-header">
@@ -832,7 +843,7 @@ const [correcting,iscorrecting]=useState(false)
             <div className="user-info">
               {/* {currentReceiver.profilePicture ? (<p>yeah</p>) : (<p>no</p>)} */}
               <div className="avatar">
-                
+
                 <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
               </div>
               <div className='userdetails'>
@@ -846,25 +857,25 @@ const [correcting,iscorrecting]=useState(false)
                   <button>Audio Call</button>
                 </div>
                 <div className='action-btns'>
-                <button onClick={() => setView(!view)} className='view-profile-btn'>
-                  {view ? (
-                    <>
-                      <FaUser />
-                      <p>Hover over card</p>
-                    </>
-                  ) : (
-                    <>
-                      <FaUser />
-                      <p>View Profile Card</p>
-                    </>
-                  )}
-                </button>
-                <div className='change-background'>
-                  <button>
-                    <FiImage /> Change background
+                  <button onClick={() => setView(!view)} className='view-profile-btn'>
+                    {view ? (
+                      <>
+                        <FaUser />
+                        <p>Hover over card</p>
+                      </>
+                    ) : (
+                      <>
+                        <FaUser />
+                        <p>View Profile Card</p>
+                      </>
+                    )}
                   </button>
-                </div>
+                  <div className='change-background'>
+                    <button>
+                      <FiImage /> Change background
+                    </button>
                   </div>
+                </div>
                 <div className="profile-card-main">
                   {view && (
                     <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setView} />
@@ -879,7 +890,7 @@ const [correcting,iscorrecting]=useState(false)
           {chat.length > 0 ? (
             chat.map((msg, index) => (
               <div
-              key={msg._id || `${msg.chatId}-${msg.createdAt}`}
+                key={msg._id || `${msg.chatId}-${msg.createdAt}`}
 
                 className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
               >
@@ -898,7 +909,7 @@ const [correcting,iscorrecting]=useState(false)
               <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
           {Object.keys(typingUsers).length > 0 && (
             <div className="typing-indicator">
@@ -908,7 +919,7 @@ const [correcting,iscorrecting]=useState(false)
             </div>
           )}
         </div>
-        
+
         {(selectedImage || selectedVideo || selectedFile || selectedGif) && (
           <div className="file-preview-container">
             <div className="file-preview">
@@ -976,11 +987,11 @@ const [correcting,iscorrecting]=useState(false)
           </div>
         )}
       </div>
-      
+
       <div className="chat-input-container">
         <div className={`input-icons ${isMenuExpanded ? 'expanded' : ''}`}>
-          <button 
-            className="menu-toggle" 
+          <button
+            className="menu-toggle"
             onClick={() => setIsMenuExpanded(!isMenuExpanded)}
             title="More options"
           >
@@ -1000,9 +1011,9 @@ const [correcting,iscorrecting]=useState(false)
                 <FiImage size={20} />
               </label>
             </div>
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               className="attachment-btn"
               onClick={() => setShowGifPicker(!showGifPicker)}
               disabled={isUploading || selectedFile || selectedImage}
@@ -1010,7 +1021,7 @@ const [correcting,iscorrecting]=useState(false)
             >
               <FiGift size={20} />
             </button>
-            
+
             {showGifPicker && (
               <div className="gif-picker">
                 <input
@@ -1036,7 +1047,7 @@ const [correcting,iscorrecting]=useState(false)
                 </div>
               </div>
             )}
-            
+
             <div className="file-input-wrapper">
               <input
                 type="file"
@@ -1050,7 +1061,7 @@ const [correcting,iscorrecting]=useState(false)
                 <FiVideo size={20} />
               </label>
             </div>
-            
+
             <div className="file-input-wrapper">
               <input
                 type="file"
@@ -1065,7 +1076,7 @@ const [correcting,iscorrecting]=useState(false)
             </div>
           </div>
         </div>
-        
+
         <div className="input-wrapper">
           <input
             ref={inputRef}
@@ -1077,8 +1088,8 @@ const [correcting,iscorrecting]=useState(false)
             className="chat-input"
             disabled={isUploading}
           />
-          <button 
-            onClick={handleCorrectMessage} 
+          <button
+            onClick={handleCorrectMessage}
             className={`correct-btn ${correcting ? 'correcting' : ''}`}
             disabled={isUploading || correcting}
             title="Improve your message with AI"
@@ -1089,7 +1100,7 @@ const [correcting,iscorrecting]=useState(false)
               </>
             ) : (
               <>
-              <i class="fa fa-magic" aria-hidden="true"></i>
+                <FaMagic size={20} />
               </>
             )}
           </button>
