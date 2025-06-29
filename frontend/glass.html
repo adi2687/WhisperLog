@@ -1,38 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-  <title>Voice to Text</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decrypt Private Key</title>
 </head>
+
 <body>
-  <button id="startBtn">Start Listening</button>
-  <p id="output"></p>
-
   <script>
-    const startBtn = document.getElementById('startBtn');
-    const output = document.getElementById('output');
+async function generateKeyPair() {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: "RSA-OAEP", modulusLength: 4096, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["encrypt", "decrypt"]
+  );
 
-    // Use webkit prefix for better support
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+  return keyPair;
+}
 
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+console.log(generateKeyPair());
+    async function decryptPrivateKeyWithPassword(encryptedPrivateKey, salt, iv, password) {
+      const encoder = new TextEncoder();
 
-    startBtn.onclick = () => {
-      recognition.start();
-      output.textContent = "Listening...";
-    };
+      // Step 1: Re-derive AES key from password and stored salt
+      const passwordKey = await window.crypto.subtle.importKey(
+        "raw",
+        encoder.encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      output.textContent = `You said: ${transcript}`;
-    };
+      const aesKey = await window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 100000,
+          hash: "SHA-256"
+        },
+        passwordKey,
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["decrypt"]
+      );
 
-    recognition.onerror = (event) => {
-      output.textContent = `Error occurred: ${event.error}`;
-    };
+      // Step 2: Decrypt the private key
+      const decryptedKeyData = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        aesKey,
+        encryptedPrivateKey
+      );
+
+      // Step 3: Import decrypted private key
+      const privateKey = await window.crypto.subtle.importKey(
+        "pkcs8",
+        decryptedKeyData,
+        {
+          name: "RSA-OAEP",
+          hash: "SHA-256"
+        },
+        true,
+        ["decrypt"]
+      );
+
+      console.log("Decrypted and Imported Private Key:", privateKey);
+      return privateKey;
+    }
+
+    // Example usage (simulate with actual stored values)
+    async function simulate() {
+      // Simulate the encryption process and then decrypt
+      const password = "user-password";
+      const encoder = new TextEncoder();
+
+      // Generate key pair
+      const keyPair = await window.crypto.subtle.generateKey(
+        {
+          name: "RSA-OAEP",
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: "SHA-256"
+        },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+
+      const passwordKey = await window.crypto.subtle.importKey(
+        "raw",
+        encoder.encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+      const aesKey = await window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt,
+          iterations: 100000,
+          hash: "SHA-256"
+        },
+        passwordKey,
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      const encryptedPrivateKey = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        aesKey,
+        exportedPrivateKey
+      );
+
+      // Now decrypt
+      const decryptedKey = await decryptPrivateKeyWithPassword(encryptedPrivateKey, salt, iv, password);
+    }
+
+    simulate();
   </script>
 </body>
+
 </html>

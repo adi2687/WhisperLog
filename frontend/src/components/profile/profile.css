@@ -1,19 +1,46 @@
 /* Dark Theme Profile Page */
 :root {
     --bg-primary: #0a0a0f;
-    --bg-secondary: #14141f;
-    --bg-tertiary: #1e1e2d;
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #262640;
+    --bg-quaternary: #333350;
     --text-primary: #ffffff;
     --text-secondary: #b8b8c5;
+    --text-tertiary: #8a8aa0;
     --accent: #7c4dff;
     --accent-hover: #6a3dff;
     --accent-light: #9a76ff;
+    --accent-soft: #b388ff;
+    --accent-darker: #5a2bff;
     --border: #2a2a3a;
+    --border-light: #3a3a4a;
     --card-bg: rgba(24, 24, 40, 0.85);
+    --card-bg-hover: rgba(34, 34, 50, 0.9);
     --shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
     --card-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    --card-shadow-hover: 0 16px 50px rgba(0, 0, 0, 0.4);
     --gradient: linear-gradient(135deg, #7c4dff 0%, #b388ff 100%);
+    --gradient-hover: linear-gradient(135deg, #6a3dff 0%, #8c67ff 100%);
+    --gradient-dark: linear-gradient(135deg, #5a2bff 0%, #7c4dff 100%);
     --glass: rgba(255, 255, 255, 0.05);
+    --glass-strong: rgba(255, 255, 255, 0.1);
+    --glass-medium: rgba(255, 255, 255, 0.07);
+    --glass-hover: rgba(255, 255, 255, 0.15);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --radius: 12px;
+    --radius-large: 16px;
+    --radius-rounded: 20px;
+    --radius-circle: 50%;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-xxl: 2.5rem;
+    --spacing-xxxl: 3rem;
+    --z-index-normal: 1;
+    --z-index-high: 10;
+    --z-index-highest: 100;
   }
   
   /* Base styles */
@@ -24,47 +51,140 @@
   
   /* Friends Section */
 .friends-section {
-  margin: 1.5rem 0;
-  max-width: 800px;
+  margin: var(--spacing-xl) 0;
+  max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
   background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: var(--radius-large);
+  padding: var(--spacing-xl);
   box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.friends-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient);
+  opacity: 0.05;
+  transition: var(--transition);
+}
+
+.friends-section:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-shadow-hover);
+  border-color: var(--accent-soft);
+}
+
+.friends-section:hover::before {
+  opacity: 0.1;
 }
 
 .friends-section h3 {
   color: var(--text-primary);
-  margin: 0 0 1.25rem 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  margin: 0 0 var(--spacing-lg) 0;
+  font-size: 1.75rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
 }
 
 .friends-section h3::before {
   content: '👥';
-  font-size: 1.1em;
+  font-size: 1.5em;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transform: translateY(-2px);
+}
+
+.friends-section h3::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--gradient);
+  opacity: 0.2;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: var(--transition-fast);
+}
+
+.friends-section h3:hover::after {
+  transform: scaleX(1);
+  opacity: 0.5;
 }
 
 .friends-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-xl);
+  padding: var(--spacing-lg) 0;
+  position: relative;
+}
+
+.friends-list::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.03));
+  pointer-events: none;
 }
 
 .friend-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem;
+  padding: var(--spacing-lg);
   background: var(--bg-tertiary);
-  border-radius: 10px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius);
+  transition: var(--transition);
   border: 1px solid var(--border);
   color: var(--text-primary);
+  position: relative;
+  overflow: hidden;
+  will-change: transform, box-shadow;
+}
+
+.friend-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.friend-item:hover {
+  background: var(--glass-hover);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  border-color: var(--accent-soft);
+}
+
+.friend-item:hover::before {
+  opacity: 0.15;
 }
 
 .friend-item-content {
@@ -73,24 +193,26 @@
   flex-grow: 1;
   cursor: pointer;
   overflow: hidden;
-  margin-right: 0.5rem;
-}
-
-.friend-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin-right: 0.75rem;
 }
 
 .friend-item img {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-circle);
   object-fit: cover;
-  margin-right: 0.75rem;
+  margin-right: var(--spacing-lg);
   border: 2px solid var(--accent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
   flex-shrink: 0;
+  transition: var(--transition);
+  will-change: transform;
+}
+
+.friend-item:hover img {
+  transform: scale(1.1);
+  border-color: var(--accent-light);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .message-icon-btn {
@@ -264,10 +386,43 @@
 }
 
 .edit-bio-btn {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  margin-top: 0.75rem;
+  background: var(--gradient);
+  color: white;
+  border: none;
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-rounded);
+  font-weight: 600;
+  transition: var(--transition);
+  box-shadow: 0 4px 12px rgba(124, 77, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.edit-bio-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient-dark);
+  opacity: 0;
+  transition: var(--transition-fast);
+}
+
+.edit-bio-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(124, 77, 255, 0.3);
+}
+
+.edit-bio-btn:hover::before {
+  opacity: 0.2;
+}
+
+.edit-bio-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(124, 77, 255, 0.2);
 }
 
 .edit-bio-btn:hover {

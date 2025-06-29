@@ -40,6 +40,18 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    publicKey: {
+        type: String,
+        default: ""
+    },
+    privateKey: {
+        type: String,
+        default: ""
+    },
+    status:{
+        type: String,
+        default: "offline"
+    },
     hobbies: {
         type: [{
             type: String,

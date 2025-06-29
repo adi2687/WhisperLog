@@ -105,7 +105,9 @@
     transform: translate(-50%, -50%) scale(0.98);
   }
 }
-
+.floating-logo{
+  width:300px;
+}
 @media (max-width: 768px) {
   .intro-content {
     width: 95%;

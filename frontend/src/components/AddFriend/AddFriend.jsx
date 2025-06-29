@@ -112,6 +112,24 @@ const AddFriend = () => {
     }
   };
 
+  const fetchall=()=>{console.log("fetchall")
+    fetch(`${apiUrl}/search/newfriends/allusers`,{
+
+    method:"GET",
+    headers:{
+      "Authorization":`Bearer ${localStorage.getItem("token")}`,
+      "Content-Type":"application/json"
+    }
+  }).then(res=>res.json())
+  .then(data=>{
+    if (data.success){
+      setSearchResults(data.users)
+    }
+    else{
+      setSearchResults("couldnt fetch users")
+      
+    }    
+  })}
   return (
     <div className="add-friend-container">
       <div className="add-friend-header">
@@ -151,7 +169,7 @@ const AddFriend = () => {
         </button>
         <button 
           className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
+          onClick={() => {setActiveTab('all');fetchall()}}
         >
           All Users
         </button>

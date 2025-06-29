@@ -153,7 +153,8 @@ useEffect(() => {
         // User profile setup flag removed
         
         // Show intro for new users
-        setShowIntro(true);
+        navigate("/intro")
+        // setShowIntro(true);
       } else {
         setError(data.message || "Signup failed.");
       }

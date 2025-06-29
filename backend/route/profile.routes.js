@@ -2,7 +2,8 @@ import express from "express";
 import { verifyToken } from "../middleware/auth.middleware.js";
 import multer from "multer";
 import cloudinary from 'cloudinary';
-import User from "../models/user.model.js";
+import User from "../models/user.model.js"; 
+import Message from "../models/message.model.js";
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -178,14 +179,72 @@ router.put("/picture", verifyToken, upload.single('profilePicture'), async (req,
     });
   }
 });
-router.get("/friends",verifyToken,async (req,res)=>{
+
+router.get("/friends", verifyToken, async (req, res) => {
   try {
     const user = req.user;
-    const friends = await User.find({ _id: { $in: user.friends } }).select("-password")
-    // console.log(friends)
-    res.status(200).json({ friends: friends });
+    const friendsprev = await User.find({ _id: { $in: user.friends } }).select("-password");
+    
+    // Get all messages for each friend
+    const friendsWithMessages = await Promise.all(friendsprev.map(async (friend) => {
+      // Find the latest message between the user and their friend
+      const latestmsg = await Message.findOne({
+        $or: [
+          { senderId: friend._id.toString(), receiverId: user._id.toString() },
+          { senderId: user._id.toString(), receiverId: friend._id.toString() }
+        ]
+      }).sort({ timestamp: -1 }) // Sort by timestamp
+      .select('message senderId receiverId timestamp isRead'); // Select correct fields
+
+      // Get sender details if message exists
+      let senderDetails = null;
+      if (latestmsg) {
+        senderDetails = await User.findById(latestmsg.senderId)
+          .select('username profilePicture');
+      }
+
+      // Get online status and last seen time
+      const onlineStatus = await User.findById(friend._id)
+        .select('status lastSeen');
+
+      return {
+        ...friend.toObject(),
+        onlineStatus: {
+          isOnline: onlineStatus?.status === 'online',
+          lastSeen: onlineStatus?.lastSeen
+        },
+        lastMessage: latestmsg ? {
+          text: latestmsg.message,
+          timestamp: latestmsg.timestamp,
+          senderId: latestmsg.senderId,
+          sender: senderDetails,
+          isRead: latestmsg.isRead,
+          isOwnMessage: latestmsg.senderId.toString() === user._id.toString()
+        } : null
+      };
+    }));
+
+    console.log('Friends with messages:', friendsWithMessages);
+    
+    // Sort friends by latest message timestamp
+    const sortedFriends = friendsWithMessages.sort((a, b) => {
+      if (!a.latestmsg && !b.latestmsg) return 0;
+      if (!a.latestmsg) return 1;
+      if (!b.latestmsg) return -1;
+      return new Date(b.latestmsg.createdAt) - new Date(a.latestmsg.createdAt);
+    });
+
+    res.status(200).json({
+      friends: sortedFriends,
+      success: true
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching friends:', error);
+    res.status(500).json({
+      message: error.message || 'Error fetching friends',
+      success: false
+    });
   }
-})
+});
+
 export default router;

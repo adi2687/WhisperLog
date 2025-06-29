@@ -804,15 +804,9 @@ const [correcting,iscorrecting]=useState(false)
       body: JSON.stringify({ sentence: message }),
     });
     const data = await response.json();
-    console.log('correct sentend',data)
-    if (data.corrected_sentence) {
+    console.log(data)
     setMessage(data.corrected_sentence);
     iscorrecting(false)
-    }
-    else{
-      iscorrecting(false)
-      setMessage('')
-    }
   };
   
   return (
@@ -842,6 +836,7 @@ const [correcting,iscorrecting]=useState(false)
                 <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
               </div>
               <div className='userdetails'>
+                {/* {JSON.stringify(currentReceiverDetails)} */}
                 <div>
                   <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
                   <div className="user-status">Online</div>
@@ -1094,7 +1089,7 @@ const [correcting,iscorrecting]=useState(false)
               </>
             ) : (
               <>
-              <i className="fa fa-magic" aria-hidden="true"></i>
+              <i class="fa fa-magic" aria-hidden="true"></i>
               </>
             )}
           </button>

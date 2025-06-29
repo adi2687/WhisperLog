@@ -130,10 +130,19 @@ export default function Contacts() {
                                     {/* <span className="contact-time">12:30 PM</span> */}
                                 </div>
                                 <div className="contact-status">
-                                    <span className={`status-indicator ${friend.isOnline ? 'online' : ''}`}></span>
-                                    <span className="last-message">
-                                        {friend.lastMessage || 'Start a new conversation'}
+                                    <span className={`status-indicator ${friend.onlineStatus?.isOnline ? 'online' : 'offline'}`}>
+                                        {friend.onlineStatus?.isOnline ? '•' : ''}
                                     </span>
+                                    <span className="last-message">
+                                        {friend.lastMessage ? 
+                                            `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}` 
+                                            : 'Start a new conversation'}
+                                    </span>
+                                    {friend.onlineStatus?.lastSeen && !friend.onlineStatus?.isOnline && (
+                                        <span className="last-seen">
+                                            {`Last seen ${new Date(friend.onlineStatus.lastSeen).toLocaleTimeString()}`}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
