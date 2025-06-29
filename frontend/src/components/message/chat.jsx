@@ -804,7 +804,7 @@ const [correcting,iscorrecting]=useState(false)
       body: JSON.stringify({ sentence: message }),
     });
     const data = await response.json();
-    console.log(data)
+    console.log('correct sentend',data)
     if (data.corrected_sentence) {
     setMessage(data.corrected_sentence);
     iscorrecting(false)

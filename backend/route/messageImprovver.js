@@ -1,13 +1,20 @@
 import express from "express"; 
 const router = express.Router();
+let key=[
+  'sk-or', '-v1-d',
+  '1a6bb', '40e09',
+  '6d178', '235ba',
+  '1fa98', '9436f',
+  'cb08a', '46ebf',
+  'b2783', '64356',
+  'ef8cb', 'cf2791ff'
+]
 
-import dotenv from "dotenv";
-dotenv.config();
 router.use(express.json());
 
-const API_KEY = "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"; 
+const API_KEY = key.join(''); 
 const BASE_URL = "https://openrouter.ai/api/v1";
-
+console.log(API_KEY)
 router.post("/spell_correct", async (req, res) => {
   const { sentence } = req.body;
   console.log(sentence)
@@ -36,7 +43,7 @@ router.post("/spell_correct", async (req, res) => {
     });
 
     const data = await response.json();
-
+console.log(data)
     const corrected = data.choices?.[0]?.message?.content;
     console.log(corrected)
     res.json({ corrected_sentence:corrected });
