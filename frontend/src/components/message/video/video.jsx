@@ -10,6 +10,8 @@ const VideoCallRoom = () => {
   const localVideoRef = useRef(null);
   const remoteVideosRef = useRef(null);
 
+  const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get("room") || "default";
@@ -100,27 +102,23 @@ const VideoCallRoom = () => {
     }
   };
 
-  const createPeerConnection = (socketId) => {
-    const config = {
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    };
-
+  const createPeerConnection = (userId) => {
     const pc = new RTCPeerConnection(config);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit("video-ice-candidate", {
-          target: socketId,
+          target: userId,
           candidate: event.candidate
         });
       }
     };
 
     pc.ontrack = (event) => {
-      let remoteVideo = document.getElementById(`video-${socketId}`);
+      let remoteVideo = document.getElementById(`video-${userId}`);
       if (!remoteVideo) {
         remoteVideo = document.createElement("video");
-        remoteVideo.id = `video-${socketId}`;
+        remoteVideo.id = `video-${userId}`;
         remoteVideo.autoplay = true;
         remoteVideo.playsInline = true;
         remoteVideo.style.width = "45%";
@@ -141,19 +139,16 @@ const VideoCallRoom = () => {
 
   return (
     <div>
-      <h2>Room: <span>{room}</span></h2>
-      <div style={{ display: "flex", flexDirection: "row" }}>
+      <h2>Room: {room}</h2>
+      <div style={{ display: 'flex', flexDirection: 'row' }}>
         <video
           ref={localVideoRef}
           autoPlay
-          muted
           playsInline
-          style={{ width: "45%", border: "1px solid black" }}
+          muted
+          style={{ width: '45%', border: '1px solid black' }}
         />
-        <div
-          ref={remoteVideosRef}
-          style={{ display: "flex", border: "1px solid red" }}
-        />
+        <div ref={remoteVideosRef} style={{ display: 'flex', flexDirection: 'row', border: '1px solid red' }} />
       </div>
     </div>
   );
