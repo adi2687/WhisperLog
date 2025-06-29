@@ -1,6 +1,14 @@
 import express from "express"; 
 const router = express.Router();
-let key=
+let key=[
+  'sk-or', '-v1-3',
+  '9dbce', 'f6c7c',
+  '88973', '3ce36',
+  '523e2', 'de7bd',
+  'df0e7', '2440c',
+  '70cf4', 'dfeaf',
+  '6b783', '8b2edbb3'
+]
 
 router.use(express.json());
 
