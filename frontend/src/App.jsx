@@ -21,7 +21,7 @@ import AddFriend from './components/AddFriend/AddFriend';
 import Message from './components/message/main';
 import Aurora from './pages/main';
 import Video from './components/message/video/video'; 
-import Join from './components/message/video/join';
+import Join from './components/message/video/JoinRoom';
 // imp
 // Protected route component
 
