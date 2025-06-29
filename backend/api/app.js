@@ -183,7 +183,34 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   // Video call room management
-  
+  socket.on("server-join", (room) => {
+    socket.join(room);
+    socket.room = room;
+    const usersInRoom = Array.from(io.sockets.adapter.rooms.get(room) || []).filter(id => id !== socket.id);
+    socket.emit("video-all-users", usersInRoom);
+    socket.to(room).emit("video-user-joined", socket.id);
+  });
+
+  socket.on("video-offer", (data) => {
+    socket.to(data.target).emit("video-offer", {
+      offer: data.offer,
+      sender: socket.id
+    });
+  });
+
+  socket.on("video-answer", (data) => {
+    socket.to(data.target).emit("video-answer", {
+      answer: data.answer,
+      sender: socket.id
+    });
+  });
+
+  socket.on("video-ice-candidate", (data) => {
+    socket.to(data.target).emit("video-ice-candidate", {
+      candidate: data.candidate,
+      sender: socket.id
+    });
+  });
 
   // Handle chat functionality
   socket.on('typing', (data) => {

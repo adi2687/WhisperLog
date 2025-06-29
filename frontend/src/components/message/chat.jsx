@@ -805,8 +805,14 @@ const [correcting,iscorrecting]=useState(false)
     });
     const data = await response.json();
     console.log(data)
+    if (data.corrected_sentence) {
     setMessage(data.corrected_sentence);
     iscorrecting(false)
+    }
+    else{
+      iscorrecting(false)
+      setMessage('')
+    }
   };
   
   return (

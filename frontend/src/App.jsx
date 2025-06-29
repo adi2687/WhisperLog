@@ -20,6 +20,8 @@ import Card from './components/profile/profilecard/card';
 import AddFriend from './components/AddFriend/AddFriend';
 import Message from './components/message/main';
 import Aurora from './pages/main';
+import Video from './components/message/video/video'; 
+import Join from './components/message/video/join';
 // imp
 // Protected route component
 
@@ -50,6 +52,8 @@ function App() {
                     <Route path="/addFriend" element={<AddFriend />} />
                     <Route path="/chat/:id" element={<Message />} />
                     <Route path='/aurora' element={<Aurora />} />
+                    <Route path='/video' element={<Video />} />
+                    <Route path='/join' element={<Join />} />
                   </Routes>
                   </main>
                   <Footer />

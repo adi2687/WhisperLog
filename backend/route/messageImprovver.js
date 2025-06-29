@@ -15,7 +15,7 @@ router.post("/spell_correct", async (req, res) => {
     return res.status(400).json({ error: "Missing 'sentence' in request body" });
   }
 
-  const prompt = `Correct the following sentence for any grammar or spelling mistakes: ${sentence} dont add any extra words or sentences just giev the correct sentence`;
+  const prompt = `Correct the following sentence for any grammar or spelling mistakes: ${sentence} dont add any extra words or sentences just give the correct sentence.`;
 
   try {
     const response = await fetch(`${BASE_URL}/chat/completions`, {
