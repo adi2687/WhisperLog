@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 const JoinRoom = () => {
+  const socket = io('http://localhost:5000');
   const [room, setRoom] = useState('');
   const navigate = useNavigate();
 

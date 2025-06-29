@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 
-const socket = io(); // Adjust if you're using a specific URL
+const socket = io('http://localhost:5000');
 
 const VideoCallRoom = () => {
   const [room, setRoom] = useState("default");
