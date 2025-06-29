@@ -1094,7 +1094,7 @@ const [correcting,iscorrecting]=useState(false)
               </>
             ) : (
               <>
-              <i class="fa fa-magic" aria-hidden="true"></i>
+              <i className="fa fa-magic" aria-hidden="true"></i>
               </>
             )}
           </button>
