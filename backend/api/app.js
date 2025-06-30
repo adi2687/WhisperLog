@@ -121,6 +121,40 @@ const io = new Server(server, {
 
 const chatMessages = new Map();
 import messageModel from '../models/message.model.js';
+import crypto from 'crypto';
+
+// Encryption configuration
+const ALGORITHM = 'aes-256-cbc';
+const IV_LENGTH = 16;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-byte-encryption-key-123456';
+
+// Generate encryption key
+const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+
+// Encrypt message
+const encrypt = (text) => {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return `${iv.toString('hex')}:${encrypted}`;
+};
+
+// Decrypt message
+const decrypt = (text) => {
+  if (!text) return text;
+  try {
+    const [ivHex, encrypted] = text.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return text; // Return original if decryption fails
+  }
+};
 
 // Function to flush messages for a specific chat to the database
 const flushBuffer = async (chatId) => {
@@ -242,24 +276,31 @@ io.on('connection', (socket) => {
       const dbmessages = await messageModel.find({ chatId }).lean();
       const buffermessage = chatMessages.get(chatId) || [];
   
-      const allmessages = [...dbmessages, ...buffermessage].map(msg => ({
-        _id: msg._id || `temp-${Date.now()}-${Math.random()}`,
-        chatId: msg.chatId,
-        senderId: msg.senderId,
-        receiverId: msg.receiverId,
-        message: msg.message || '',
-        isRead: msg.isRead ?? false,
-        timestamp: msg.timestamp || Date.now(),
-        imageUrl: msg.imageUrl || null,
-        fileUrl: msg.fileUrl || null,
-        fileName: msg.fileName || null,
-        fileType: msg.fileType || null,
-        fileSize: msg.fileSize || null,
-        status: msg.status || 'sent',
-        createdAt: msg.createdAt || new Date(msg.timestamp || Date.now()),
-        updatedAt: msg.updatedAt || new Date(msg.timestamp || Date.now()),
-      }));
-  
+      // Process and decrypt messages when loading
+      const allmessages = [...dbmessages, ...buffermessage].map(msg => {
+        // Skip decryption if the message is already decrypted (has no iv:encrypted format)
+        const isEncrypted = msg.message && typeof msg.message === 'string' && msg.message.includes(':');
+        const messageContent = isEncrypted ? decrypt(msg.message) : msg.message;
+        
+        return {
+          ...msg,
+          _id: msg._id || `temp-${Date.now()}-${Math.random()}`,
+          chatId: msg.chatId,
+          senderId: msg.senderId,
+          receiverId: msg.receiverId,
+          message: messageContent || '',
+          isRead: msg.isRead ?? false,
+          timestamp: msg.timestamp || Date.now(),
+          imageUrl: msg.imageUrl || null,
+          fileUrl: msg.fileUrl || null,
+          fileName: msg.fileName || null,
+          fileType: msg.fileType || null,
+          fileSize: msg.fileSize || null,
+          status: msg.status || 'sent',
+          createdAt: msg.createdAt || new Date(msg.timestamp || Date.now()),
+          updatedAt: msg.updatedAt || new Date(msg.timestamp || Date.now())
+        };
+      });
       // Optional: sort by createdAt
       allmessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   
@@ -275,6 +316,8 @@ io.on('connection', (socket) => {
     chatId, message, senderId, receiverId, imageUrl, 
     fileUrl, fileName, fileType, fileSize, tempMessageId, _id 
   }) => {
+    // Encrypt the message if it exists
+    const encryptedMessage = message ? encrypt(message) : message;
     try {
       // console.log('New message received:', { 
       //   tempMessageId,
@@ -295,7 +338,7 @@ io.on('connection', (socket) => {
       const newMsg = {
         _id: _id?.startsWith('temp-') ? undefined : _id,
         chatId,
-        message: message || '',
+        message: encryptedMessage || '',
         timestamp: Date.now(),
         senderId,
         receiverId,
@@ -345,8 +388,18 @@ io.on('connection', (socket) => {
         };
       }
   
-      // Emit message to all clients in the chat room
-      io.to(chatId).emit('message', messageData);
+        // Prepare decrypted message for clients
+      const decryptedMessage = messageData.message && typeof messageData.message === 'string' && messageData.message.includes(':') 
+        ? decrypt(messageData.message) 
+        : messageData.message;
+      
+      const decryptedMessageData = {
+        ...messageData,
+        message: decryptedMessage || ''
+      };
+      
+      // Emit decrypted message to all clients in the chat room
+      io.to(chatId).emit('message', decryptedMessageData);
 
       // Acknowledge to sender with current status
       if (tempMessageId) {

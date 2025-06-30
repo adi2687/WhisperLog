@@ -5,9 +5,8 @@
   width: 100%;
   overflow: hidden;
   background-color: #121212;
-  height:95vh;
+  height:100vh;
   margin-top:0;
-  position: absolute;
 }
 
 .main-content {

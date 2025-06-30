@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone } from 'react-icons/fi';
 import { FaMagic, FaSpinner } from 'react-icons/fa';
 
 import { format } from 'date-fns';
@@ -75,7 +75,7 @@ export default function Message({ receiverDetails, onBack }) {
 
           typingTimeout.current = setTimeout(() => {
             setTypingUsers(prev => {
-              const newTyping = {...prev};
+              const newTyping = { ...prev };
               delete newTyping[data.userId];
               return newTyping;
             });
@@ -469,6 +469,65 @@ export default function Message({ receiverDetails, onBack }) {
     }
   };
 
+  // Handle new incoming messages
+  const handleNewMessage = useCallback((msg) => {
+    setChat(prev => {
+      // Create a unique identifier for the message
+      const msgId = msg._id || msg.tempMessageId || `temp-${Date.now()}`;
+
+      // Check if message already exists using multiple criteria
+      const existingMsgIndex = prev.findIndex(m => {
+        // Check by ID if available
+        if (m._id && m._id === msg._id) return true;
+
+        // Check by temp ID if available
+        if (m.tempMessageId && msg.tempMessageId && m.tempMessageId === msg.tempMessageId) return true;
+
+        // Check by content and timing for potential duplicates
+        if (m.content && msg.content &&
+          m.content === msg.content &&
+          m.senderId === msg.senderId &&
+          Math.abs(new Date(m.createdAt || 0) - new Date(msg.createdAt || 0)) < 1000) {
+          return true;
+        }
+
+        return false;
+      });
+
+      // If message exists, update it instead of adding a duplicate
+      if (existingMsgIndex !== -1) {
+        const updatedMessages = [...prev];
+        // Preserve existing message ID if the new one is temporary
+        const existingId = updatedMessages[existingMsgIndex]._id;
+        updatedMessages[existingMsgIndex] = {
+          ...updatedMessages[existingMsgIndex],
+          ...msg,
+          _id: msg._id && !msg._id.startsWith('temp-') ? msg._id : existingId,
+          status: msg.status || 'delivered'
+        };
+        return updatedMessages;
+      }
+
+      // Format the new message with all required fields
+      const newMsg = {
+        ...msg,
+        _id: msgId,
+        tempMessageId: msg.tempMessageId || `temp-${Date.now()}`,
+        status: 'delivered',
+        createdAt: msg.createdAt || new Date().toISOString(),
+        fileUrl: msg.fileUrl || null,
+        fileName: msg.fileName || null,
+        fileType: msg.fileType || null,
+        fileSize: msg.fileSize || null,
+        imageUrl: msg.imageUrl || null,
+        senderId: msg.senderId || null,
+        receiverId: msg.receiverId || null,
+      };
+
+      return [...prev, newMsg];
+    });
+  }, []);
+
   // Load existing messages when chatId changes
   useEffect(() => {
     if (!chatId) return;
@@ -476,7 +535,7 @@ export default function Message({ receiverDetails, onBack }) {
     // Join the chat room
     socket.emit('joinchat', { chatId });
 
-    // Handle incoming messages from socket
+    // Handle initial message load
     const handleLoadMessages = (msgs) => {
       console.log('loading messages', msgs);
       const formattedMessages = Array.isArray(msgs)
@@ -493,69 +552,28 @@ export default function Message({ receiverDetails, onBack }) {
           receiverId: msg.receiverId || null
         }))
         : [];
+
       setIsTyping(false);
 
+      // Deduplicate messages when loading
       setChat(prev => {
         const filteredPrev = prev.filter(msg => !String(msg._id).startsWith('temp-'));
-
-        // Optional deduplication by real IDs:
         const existingIds = new Set(filteredPrev.map(m => m._id));
-        const newMessages = formattedMessages.filter(m => !existingIds.has(m.id));
-
+        const newMessages = formattedMessages.filter(m => !existingIds.has(m._id));
         return [...filteredPrev, ...newMessages];
       });
-    }
-    socket.on('loadMessages', handleLoadMessages);
+    };
 
+    // Set up socket listeners
+    socket.on('loadMessages', handleLoadMessages);
+    socket.on('message', handleNewMessage);
+
+    // Clean up socket listeners
     return () => {
       socket.off('loadMessages', handleLoadMessages);
-    };
-  }, [chatId]);
-
-  // Listen for new messages
-  useEffect(() => {
-    const handleNewMessage = (msg) => {
-      setChat(prev => {
-        // Check if we already have this message (by ID or tempMessageId)
-        const messageExists = prev.some(m =>
-          m._id === msg._id ||
-          (msg.tempMessageId && m._id === msg.tempMessageId) ||
-          (m.tempMessageId && m.tempMessageId === msg._id)
-        );
-
-        if (messageExists) {
-          // If message exists, update it with server data
-          return prev.map(m =>
-            (m._id === msg._id || m._id === msg.tempMessageId || m.tempMessageId === msg._id)
-              ? { ...m, ...msg, _id: msg._id || m._id } // Ensure we keep the server ID
-              : m
-          );
-        }
-
-        // If it's a new message, add it
-        const formattedMsg = {
-          ...msg,
-          fileUrl: msg.fileUrl || null,
-          fileName: msg.fileName || null,
-          fileType: msg.fileType || null,
-          fileSize: msg.fileSize || null,
-          imageUrl: msg.imageUrl || null,
-          createdAt: msg.createdAt || new Date().toISOString(),
-          senderId: msg.senderId || null,
-          receiverId: msg.receiverId || null,
-          // If this is a server message with a temp ID, update the ID
-          _id: msg._id || msg.tempMessageId || `temp-${Date.now()}`
-        };
-
-        return [...prev, formattedMsg];
-      });
-    };
-
-    socket.on('message', handleNewMessage);
-    return () => {
       socket.off('message', handleNewMessage);
     };
-  }, []);
+  }, [chatId, handleNewMessage]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -574,7 +592,7 @@ export default function Message({ receiverDetails, onBack }) {
   };
 
 
-  
+
   // Reset profile card visibility when chat changes
   useEffect(() => {
     setView(false);
@@ -765,9 +783,7 @@ export default function Message({ receiverDetails, onBack }) {
     setMessage(newMessage);
 
     // Clear any existing timeout
-    if (typingDebounce.current) {
-      clearTimeout(typingDebounce.current);
-    }
+
 
     // If there's a message, emit typing event
     if (newMessage.trim()) {
@@ -778,10 +794,7 @@ export default function Message({ receiverDetails, onBack }) {
         lastTypingTime.current = now;
       }
 
-      // Set up debounce for stopping typing indicator
-      typingDebounce.current = setTimeout(() => {
-        socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
-      }, 2000);
+
     } else {
       socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
     }
@@ -852,27 +865,25 @@ export default function Message({ receiverDetails, onBack }) {
                   <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
                   <div className="user-status">Online</div>
                 </div>
-                <div className='call-btns'>
-                  <button>Video Call</button>
-                  <button>Audio Call</button>
-                </div>
-                <div className='action-btns'>
-                  <button onClick={() => setView(!view)} className='view-profile-btn'>
-                    {view ? (
-                      <>
-                        <FaUser />
-                        <p>Hover over card</p>
-                      </>
-                    ) : (
-                      <>
-                        <FaUser />
-                        <p>View Profile Card</p>
-                      </>
-                    )}
-                  </button>
-                  <div className='change-background'>
-                    <button>
-                      <FiImage /> Change background
+                <div className='header-actions'>
+                  <div className='call-btns'>
+                    <button className='icon-btn' title="Video Call">
+                      <FiVideo />
+                    </button>
+                    <button className='icon-btn' title="Audio Call">
+                      <FiPhone />
+                    </button>
+                  </div>
+                  <div className='action-btns'>
+                    <button
+                      onClick={() => setView(!view)}
+                      className='icon-btn'
+                      title={view ? "Hide Profile" : "View Profile"}
+                    >
+                      <FaUser />
+                    </button>
+                    <button className='icon-btn' title="Change Background">
+                      <FiImage />
                     </button>
                   </div>
                 </div>
@@ -890,7 +901,7 @@ export default function Message({ receiverDetails, onBack }) {
           {chat.length > 0 ? (
             chat.map((msg, index) => (
               <div
-                key={msg._id || `${msg.chatId}-${msg.createdAt}`}
+                key={`${msg._id || 'temp'}-${msg.timestamp || Date.now()}-${index}`}
 
                 className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
               >
@@ -1111,7 +1122,7 @@ export default function Message({ receiverDetails, onBack }) {
                 <span className="recording-text">Listening...</span>
               </div>
             )}
-            <button 
+            <button
               type="button"
               className={`voice-btn ${isListening ? 'listening' : ''}`}
               onClick={toggleVoiceRecognition}
@@ -1122,7 +1133,7 @@ export default function Message({ receiverDetails, onBack }) {
             </button>
           </div>
         </div>
-        
+
         <button
           onClick={handleSendMessage}
           className="send-btn"
