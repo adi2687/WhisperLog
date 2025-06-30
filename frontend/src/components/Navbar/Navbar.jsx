@@ -11,7 +11,7 @@ const Navbar = () => {
   const location = useLocation();
   const apiUrl = import.meta.env.VITE_BACKEND_URL
   // console.log(apiUrl)
-  const islogged=localStorage.getItem("token")
+  const islogged=localStorage.getItem("token") || localStorage.getItem("user")
   // console.log(islogged) 
   useEffect(()=>{
     if (islogged){
