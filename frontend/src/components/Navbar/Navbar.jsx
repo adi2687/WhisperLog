@@ -7,11 +7,12 @@ import "./NavDropdown.css";
 import NotificationBell from "../Notifications/NotificationBell";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [check, setCheck] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Track login status
   const location = useLocation();
   const apiUrl = import.meta.env.VITE_BACKEND_URL
   // console.log(apiUrl)
-  const islogged=localStorage.getItem("token") 
+  const islogged=localStorage.getItem("token")
   // console.log(islogged) 
   useEffect(()=>{
     if (islogged){
