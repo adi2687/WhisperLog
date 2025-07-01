@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiCamera } from 'react-icons/fi';
 import { FaMagic, FaSpinner } from 'react-icons/fa';
 
 import { format } from 'date-fns';
@@ -47,6 +47,7 @@ export default function Message({ receiverDetails, onBack }) {
   const recognitionRef = useRef(null);
   const lastTypingTime = useRef(0);
 
+  const [imageshow,setimageshow]=useState("")
   // Update receiver if props or location changes
   useEffect(() => {
     if (receiver) setCurrentReceiver(receiver);
@@ -537,6 +538,7 @@ export default function Message({ receiverDetails, onBack }) {
 
     // Handle initial message load
     const handleLoadMessages = (msgs) => {
+      setChat([])
       console.log('loading messages', msgs);
       const formattedMessages = Array.isArray(msgs)
         ? msgs.map(msg => ({
@@ -575,6 +577,63 @@ export default function Message({ receiverDetails, onBack }) {
     };
   }, [chatId, handleNewMessage]);
 
+  // Detect screenshot attempts
+  useEffect(() => {
+    const handleKeyUp = (e) => {
+      // Check for Print Screen key (works for both standalone and Win+Print Screen)
+      if (e.key === 'PrintScreen' || e.keyCode === 44) {
+        handleScreenshotDetected();
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      // Check for Windows+Shift+S or Cmd+Shift+3/4 on Mac
+      if (
+        (e.key === 's' && e.ctrlKey && e.shiftKey) || // Windows+Shift+S
+        (e.key === 's' && e.metaKey && e.shiftKey) ||  // Cmd+Shift+S (Mac)
+        (e.key === '3' && e.metaKey) ||                // Cmd+3 (Mac)
+        (e.key === '4' && e.metaKey)                   // Cmd+4 (Mac)
+      ) {
+        handleScreenshotDetected();
+      }
+    };
+
+    const handleScreenshotDetected = () => {
+      // Send screenshot notification
+      const screenshotNotification = {
+        _id: `screenshot-${Date.now()}`,
+        chatId,
+        message: '⚠️ Screenshot detected',
+        timestamp: Date.now(),
+        senderId: 'system',
+        isSystemMessage: true,
+        status: 'delivered'
+      };
+      
+      setChat(prev => [...prev, screenshotNotification]);
+      
+      // Notify other users in the chat
+      if (socket && chatId) {
+        socket.emit('system_message', {
+          chatId,
+          message: 'A screenshot was taken in this chat',
+          type: 'screenshot',
+          userId: user?._id,
+          username: user?.username
+        });
+      }
+    };
+
+    // Use both keyup (for Print Screen) and keydown (for other shortcuts)
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [chatId, socket, user?._id, user?.username]);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
@@ -598,8 +657,116 @@ export default function Message({ receiverDetails, onBack }) {
     setView(false);
   }, [chatId]);
 
+
+  const [translations, setTranslations] = useState({});
+  const [loadingTranslations, setLoadingTranslations] = useState({});
+  const [menuOpen, setMenuOpen] = useState(null);
+  const menuRef = useRef(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const toggleMenu = (messageId, e) => {
+    e.stopPropagation();
+    setMenuOpen(menuOpen === messageId ? null : messageId);
+  };
+
+  const translateMessage = async (msg) => {
+    const messageId = msg._id || msg.tempMessageId;
+    console.log('Starting translation for message:', { messageId, text: msg.message });
+
+    // If already translated, just toggle the view
+    if (translations[messageId]) {
+      console.log('Toggling translation view for message:', messageId);
+      setTranslations(prev => ({
+        ...prev,
+        [messageId]: prev[messageId] ? null : true
+      }));
+      return;
+    }
+
+    // Set loading state
+    setLoadingTranslations(prev => ({
+      ...prev,
+      [messageId]: true
+    }));
+
+    const backend = import.meta.env.VITE_BACKEND_URL;
+    const token = localStorage.getItem('token');
+    
+    console.log('Sending translation request to:', `${backend}/messageImprover/translate`);
+    console.log('Auth token exists:', !!token);
+
+    try {
+      const response = await fetch(`${backend}/messageImprover/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: msg.message,
+        }),
+      });
+
+      console.log('Translation response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Translation response data:', data);
+
+      if (!data || !data.corrected_sentence) {
+        throw new Error('No corrected_sentence in response');
+      }
+
+      setTranslations(prev => ({
+        ...prev,
+        [messageId]: data.corrected_sentence
+      }));
+      
+    } catch (error) {
+      console.error('Translation error:', error);
+      // On error, show original message but log the error
+      setTranslations(prev => ({
+        ...prev,
+        [messageId]: msg.message
+      }));
+      
+      // Show error to user (you might want to use a toast or other UI element)
+      alert(`Translation failed: ${error.message}`);
+      
+    } finally {
+      setLoadingTranslations(prev => ({
+        ...prev,
+        [messageId]: false
+      }));
+    }
+  }
   // Render message content based on type
   const renderMessageContent = (msg) => {
+    // Render system messages differently
+    if (msg.isSystemMessage) {
+      return (
+        <div className="system-message">
+          <FiCamera className="system-icon" />
+          <span>{msg.message}</span>
+        </div>
+      );
+    }
     if (msg.imageUrl) {
       return (
         <div className="message-image">
@@ -607,7 +774,10 @@ export default function Message({ receiverDetails, onBack }) {
             src={msg.imageUrl}
             alt="Shared content"
             className="chat-image"
-            onClick={() => window.open(msg.imageUrl, '_blank')}
+            onClick={() => {
+              // window.open(msg.imageUrl, '_blank')
+              setimageshow(msg.imageUrl)
+            }}
           />
           {msg.message && <div className="image-caption">{msg.message}</div>}
         </div>
@@ -670,7 +840,91 @@ export default function Message({ receiverDetails, onBack }) {
         </div>
       );
     }
-    return msg.message ? <p style={{ color: "white", fontFamily: "Inter", fontSize: "14px" }}>{msg.message}</p> : null;
+    const messageId = msg._id || msg.tempMessageId;
+    const isTranslated = !!translations[messageId];
+    const isLoading = loadingTranslations[messageId];
+    const showMenu = menuOpen === messageId;
+
+    if (!msg.message) return null;
+
+    return (
+      <div className="message-content">
+        <div className="message-text">
+          {isLoading ? (
+            <div className="translation-loader">
+              <div className="loader-dot"></div>
+              <div className="loader-dot"></div>
+              <div className="loader-dot"></div>
+              <span>Translating...</span>
+            </div>
+          ) : isTranslated ? (
+            <div className="message-text-content translated-text">
+              {translations[messageId]}
+            </div>
+          ) : (
+            <div className="message-text-content original-text">
+              {msg.message}
+            </div>
+          )}
+        </div>
+        
+        <div className="message-footer">
+          <span className="message-time">
+            {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
+          </span>
+          {msg.senderId===receiver ? (
+          <div className="message-actions">
+            <button
+              className={`menu-dot ${showMenu ? 'active' : ''}`}
+              onClick={(e) => toggleMenu(messageId, e)}
+              aria-label="Message actions"
+              aria-expanded={showMenu}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            {showMenu && (
+              <div className="message-dropdown" ref={menuRef}>
+                <button 
+                  className="dropdown-item" 
+                  onClick={() => { 
+                    translateMessage(msg); 
+                    setMenuOpen(null); 
+                  }} 
+                  disabled={isLoading}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.87 15.07L10 12.28V12.28C9.4 11.74 8.31 11.78 7.76 12.38C7.21 12.97 7.25 14 7.86 14.63L11.3 18.07C11.69 18.46 12.32 18.46 12.71 18.07L16.15 14.63C16.74 14.04 16.8 13.02 16.27 12.38C15.74 11.74 14.65 11.75 14.09 12.32L12.86 13.56" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M8.5 10.19L10.38 12.07L12.26 10.19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M8.5 8.5H8.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M11.5 8.5H11.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14.5 8.5H14.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>{isLoading ? 'Translating...' : isTranslated ? 'Show Original' : 'Translate to English'}</span>
+                </button>
+                <button className="dropdown-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 8L21 11M21 11L18 14M21 11H3M13 3C9.13401 3 6 6.13401 6 10V11M6 21H10M6 21L3 18M6 21L9 18M18 18L15 21M18 21H14M18 21L21 18M10 3C13.866 3 17 6.13401 17 10V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Forward</span>
+                </button>
+                <button className="dropdown-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 7L18.1327 19.1125C18.0579 20.1891 17.187 21.0709 16.1108 21.1055C15.9159 21.1129 15.5 21.1129 15.5 21.1129C15.5 21.1129 14.5 21.1129 14.5 20.1129C14.5 19.1129 14.5 17.5 14.5 17.5M14.5 17.5H17.5M14.5 17.5H9.5M9.5 17.5H4.5M9.5 17.5V20.5C9.5 21.5 8.5 21.5 8.5 21.5H5.5C4.5 21.5 4.5 20.5 4.5 20.5V17.5M9.5 17.5H4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M10.5 10.5L15.5 5.5M15.5 5.5L10.5 0.5M15.5 5.5H1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <span>Reply</span>
+                </button>
+              </div>
+            )}
+          </div>
+          ) : (
+            null
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Initialize speech recognition on component mount
@@ -835,6 +1089,7 @@ export default function Message({ receiverDetails, onBack }) {
 
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
+      
       <div style={{
         position: 'relative',
         zIndex: 1,
@@ -892,6 +1147,29 @@ export default function Message({ receiverDetails, onBack }) {
                     <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setView} />
                   )}
                 </div>
+                {imageshow && (
+                  <div className="image-modal" onClick={(e) => e.target.className === 'image-modal' && setimageshow(false)}>
+                    <div className="image-modal-content">
+                      <button 
+                        className="close-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setimageshow(false);
+                        }}
+                        aria-label="Close image"
+                      >
+                        &times;
+                      </button>
+                      <div className="image-container">
+                        <img 
+                          src={imageshow} 
+                          alt="Full size preview" 
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -908,9 +1186,7 @@ export default function Message({ receiverDetails, onBack }) {
                 <div className='message-main'>
                   <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
                     {renderMessageContent(msg)}
-                    <span className="message-time">
-                      {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
-                    </span>
+
                   </div>
                 </div>
               </div>

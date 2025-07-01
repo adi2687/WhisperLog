@@ -23,7 +23,7 @@ router.post("", async (req, res) => {
         const newUser = new UserModel({ username, email, password: hashedPassword })
         newUser.status="online"
         await newUser.save()
-        const token = jwt.sign({ username: newUser.username, id: newUser._id, email: newUser.email, profilePicture: newUser.profileImageURL }, SECRET_KEY, { expiresIn: '24h' })
+        const token = jwt.sign({ username: newUser.username, id: newUser._id, email: newUser.email, profilePicture: newUser.profileImageURL }, SECRET_KEY, { expiresIn: '72h' })
         res.cookie("token", token, {
             httpOnly: true,
             secure: true,

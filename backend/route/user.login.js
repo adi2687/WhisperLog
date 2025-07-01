@@ -20,7 +20,7 @@ router.post("",async (req,res)=>{
         if (!isPasswordValid) {
             return res.status(401).json({message:"Invalid password"})
         }
-        const token=jwt.sign({username:user.username,id:user._id,email:user.email,profilePicture:user.profileImageURL},SECRET_KEY,{expiresIn:'24h'})
+        const token=jwt.sign({username:user.username,id:user._id,email:user.email,profilePicture:user.profileImageURL},SECRET_KEY,{expiresIn:'72h'})
         res.cookie("token",token,{
             httpOnly:true,
             secure:true,
