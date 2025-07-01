@@ -41,24 +41,136 @@ export default function Message({ receiverDetails, onBack }) {
   const [gifs, setGifs] = useState([]);
   const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastSeen, setLastSeen] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeout = useRef(null);
   const recognitionRef = useRef(null);
   const lastTypingTime = useRef(0);
 
-  const [imageshow,setimageshow]=useState("")
+  const [imageshow, setimageshow] = useState("")
   // Update receiver if props or location changes
   useEffect(() => {
     if (receiver) setCurrentReceiver(receiver);
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
   }, [receiver, receiverDetails]);
 
+  // Fetch user status when receiver changes
+  useEffect(() => {
+    const fetchUserStatus = async () => {
+      if (!currentReceiver) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/${currentReceiver}/status`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsOnline(data.isOnline);
+          setLastSeen(data.lastSeen);
+        }
+      } catch (error) {
+        console.error('Error fetching user status:', error);
+      }
+    };
+
+    fetchUserStatus();
+  }, [currentReceiver]);
+
+  // Handle user status updates from socket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserStatus = (data) => {
+      if (data.userId === currentReceiver) {
+        setIsOnline(data.isOnline);
+        setLastSeen(data.lastSeen);
+      }
+    };
+
+    // Listen for status updates
+    socket.on('user_status', handleUserStatus);
+
+    // Register current user with socket server
+    if (user?._id) {
+      socket.emit('register', user._id);
+    }
+
+    return () => {
+      socket.off('user_status', handleUserStatus);
+    };
+  }, [socket, currentReceiver, user?._id]);
+
+  // Fetch user status when receiver changes
+  useEffect(() => {
+    const fetchUserStatus = async () => {
+      if (!currentReceiver) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/${currentReceiver}/status`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsOnline(data.isOnline);
+          setLastSeen(data.lastSeen);
+        }
+      } catch (error) {
+        console.error('Error fetching user status:', error);
+      }
+    };
+
+    fetchUserStatus();
+  }, [currentReceiver]);
+
+  // Handle user status updates from socket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserStatus = (data) => {
+      if (data.userId === currentReceiver) {
+        setIsOnline(data.isOnline);
+        setLastSeen(data.lastSeen);
+      }
+    };
+
+    // Listen for status updates
+    socket.on('user_status', handleUserStatus);
+
+    // Register current user with socket server
+    if (user?._id) {
+      socket.emit('register', user._id);
+    }
+
+    return () => {
+      socket.off('user_status', handleUserStatus);
+    };
+  }, [socket, currentReceiver, user?._id]);
+
+  // Format last seen time
+  const formatLastSeen = (timestamp) => {
+    if (!timestamp) return 'Offline';
+    const date = new Date(timestamp);
+    return `Last seen ${date.toLocaleString()}`;
+  };
+
   // Join the chat room and set up socket listeners
   useEffect(() => {
     if (chatId) {
       console.log('Joining chat:', chatId);
       socket.emit('join_room', { roomId: chatId, userId: user?._id });
+      
+      // Register user with socket server for online status
+      if (user?._id) {
+        socket.emit('register', user._id);
+      }
 
       // Listen for typing events
       const handleTyping = (data) => {
@@ -85,7 +197,7 @@ export default function Message({ receiverDetails, onBack }) {
         }
       };
 
-      // Add the event listener
+      // Add the event listeners
       socket.on('typing', handleTyping);
 
       // Clean up event listeners
@@ -830,6 +942,10 @@ export default function Message({ receiverDetails, onBack }) {
         <div className="message-file" onClick={() => window.open(msg.fileUrl, '_blank')}>
           <div className="file-icon">{getFileIcon(msg.fileName || 'file')}</div>
           <div className="file-info">
+            <div className="user-name">{currentReceiverDetails?.username || 'Unknown User'}</div>
+            <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
+              {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
+            </div>
             <div className="file-name" title={msg.fileName}>
               {msg.fileName || 'Download file'}
             </div>
@@ -872,8 +988,8 @@ export default function Message({ receiverDetails, onBack }) {
           <span className="message-time">
             {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
           </span>
-          {msg.senderId===receiver ? (
-          <div className="message-actions">
+          {msg.senderId === receiver && (
+            <div className="message-actions">
             <button
               className={`menu-dot ${showMenu ? 'active' : ''}`}
               onClick={(e) => toggleMenu(messageId, e)}
@@ -918,9 +1034,7 @@ export default function Message({ receiverDetails, onBack }) {
                 </button>
               </div>
             )}
-          </div>
-          ) : (
-            null
+            </div>
           )}
         </div>
       </div>
@@ -1037,7 +1151,9 @@ export default function Message({ receiverDetails, onBack }) {
     setMessage(newMessage);
 
     // Clear any existing timeout
-
+    if (typingTimeout.current) {
+      clearTimeout(typingTimeout.current);
+    }
 
     // If there's a message, emit typing event
     if (newMessage.trim()) {
@@ -1048,7 +1164,10 @@ export default function Message({ receiverDetails, onBack }) {
         lastTypingTime.current = now;
       }
 
-
+      // Set timeout to stop typing indicator when user stops typing
+      typingTimeout.current = setTimeout(() => {
+        socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
+      }, 2000);
     } else {
       socket.emit('stop_typing', { roomId: chatId, userId: user?._id });
     }
@@ -1089,93 +1208,41 @@ export default function Message({ receiverDetails, onBack }) {
 
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
-      
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {currentReceiverDetails && (
-          <div className="chat-header">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="back-button"
-                aria-label="Back to contacts"
-              >
-                &larr;
-              </button>
-            )}
-            <div className="user-info">
-              {/* {currentReceiver.profilePicture ? (<p>yeah</p>) : (<p>no</p>)} */}
-              <div className="avatar">
-
-                <img src={currentReceiverDetails.profilePicture || '/default-avatar.svg'} alt="" />
-              </div>
-              <div className='userdetails'>
-                {/* {JSON.stringify(currentReceiverDetails)} */}
-                <div>
-                  <div className="user-name">{currentReceiverDetails.username || 'Unknown User'}</div>
-                  <div className="user-status">Online</div>
-                </div>
-                <div className='header-actions'>
-                  <div className='call-btns'>
-                    <button className='icon-btn' title="Video Call">
-                      <FiVideo />
-                    </button>
-                    <button className='icon-btn' title="Audio Call">
-                      <FiPhone />
-                    </button>
-                  </div>
-                  <div className='action-btns'>
-                    <button
-                      onClick={() => setView(!view)}
-                      className='icon-btn'
-                      title={view ? "Hide Profile" : "View Profile"}
-                    >
-                      <FaUser />
-                    </button>
-                    <button className='icon-btn' title="Change Background">
-                      <FiImage />
-                    </button>
-                  </div>
-                </div>
-                <div className="profile-card-main">
-                  {view && (
-                    <ProfileCard receiverdetails={currentReceiverDetails} setviewcard={setView} />
-                  )}
-                </div>
-                {imageshow && (
-                  <div className="image-modal" onClick={(e) => e.target.className === 'image-modal' && setimageshow(false)}>
-                    <div className="image-modal-content">
-                      <button 
-                        className="close-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setimageshow(false);
-                        }}
-                        aria-label="Close image"
-                      >
-                        &times;
-                      </button>
-                      <div className="image-container">
-                        <img 
-                          src={imageshow} 
-                          alt="Full size preview" 
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <div className="chat-content">
+      <div className="chat-header">
+        <div className="chat-header-info">
+          <h3>{currentReceiverDetails?.username || 'Chat'}</h3>
+          <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
+            {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
+          </div>
+        </div>
+      </div>
+      {/* Image Preview Modal */}
+      {imageshow && (
+        <div className="image-preview-modal" onClick={() => setimageshow(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="close-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setimageshow(false);
+              }}
+              aria-label="Close image"
+            >
+              &times;
+            </button>
+            <div className="image-container">
+              <img 
+                src={imageshow} 
+                alt="Full size preview" 
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="chat-box">
+      <div className="chat-box">
           {chat.length > 0 ? (
             chat.map((msg, index) => (
               <div
@@ -1256,6 +1323,10 @@ export default function Message({ receiverDetails, onBack }) {
                     {getFileIcon(selectedFile.type)}
                   </div>
                   <div className="file-info">
+                    <div className="user-name">{currentReceiverDetails?.username || 'Unknown User'}</div>
+                    <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
+                      {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
+                    </div>
                     <div className="file-name">{selectedFile.name}</div>
                     <div className="file-size">
                       {formatFileSize(selectedFile.size)}
@@ -1274,7 +1345,7 @@ export default function Message({ receiverDetails, onBack }) {
           </div>
         )}
       </div>
-
+      
       <div className="chat-input-container">
         <div className={`input-icons ${isMenuExpanded ? 'expanded' : ''}`}>
           <button

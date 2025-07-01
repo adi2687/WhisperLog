@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import MessageModel from './models/message.model.js';
 import ChatModel from './models/chat.model.js';
+import UserModel from './models/user.model.js';
 
 const userSockets = new Map(); // userId -> socketId mapping
 const chatRooms = new Map(); // chatId -> Set of userIds
@@ -34,11 +35,24 @@ const initSocketHandlers = (io) => {
             }
         });
 
-        // When a user connects, store their userId and socketId
-        socket.on('register', (userId) => {
+        // When a user connects, store their userId and socketId and set online status
+        socket.on('register', async (userId) => {
             if (userId) {
                 userSockets.set(userId, socket.id);
-                // console.log(User ${userId} connected with socket ${socket.id});
+                // Update user's online status in database
+                await UserModel.findByIdAndUpdate(userId, {
+                    isOnline: true,
+                    lastSeen: new Date()
+                });
+                
+                // Notify all connected clients about the user's online status
+                io.emit('user_status', {
+                    userId,
+                    isOnline: true,
+                    lastSeen: new Date()
+                });
+                
+                console.log(`User ${userId} is now online`);
             }
         });
 
@@ -133,7 +147,33 @@ const initSocketHandlers = (io) => {
         
 
         // Handle disconnection
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
+            // Find the user who disconnected
+            let disconnectedUserId = null;
+            for (const [userId, socketId] of userSockets.entries()) {
+                if (socketId === socket.id) {
+                    disconnectedUserId = userId;
+                    userSockets.delete(userId);
+                    break;
+                }
+            }
+
+            if (disconnectedUserId) {
+                // Update user's online status in database
+                await UserModel.findByIdAndUpdate(disconnectedUserId, {
+                    isOnline: false,
+                    lastSeen: new Date()
+                });
+                
+                // Notify all connected clients about the user's offline status
+                io.emit('user_status', {
+                    userId: disconnectedUserId,
+                    isOnline: false,
+                    lastSeen: new Date()
+                });
+                
+                console.log(`User ${disconnectedUserId} is now offline`);
+            }
             console.log('Client disconnected:', socket.id);
             
             // Remove the user from our mapping and all chat rooms

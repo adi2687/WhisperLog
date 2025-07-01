@@ -1,7 +1,8 @@
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaSearch, FaUserFriends, FaUser } from 'react-icons/fa';
+import { FaSearch, FaUserFriends, FaUser, FaCircle } from 'react-icons/fa';
+import { io } from 'socket.io-client';
 import './contacts.css';
 
 export default function Contacts() {
@@ -11,6 +12,8 @@ export default function Contacts() {
     const navigate = useNavigate();
     const [friends, setFriends] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [onlineUsers, setOnlineUsers] = useState({});
+    const socketRef = useRef(null);
 
     const getFriends = () => {
         fetch(`${backendUrl}/api/profile/friends`, {
@@ -32,7 +35,47 @@ export default function Contacts() {
 
     useEffect(() => {
         getFriends();
-    }, []);
+        
+        // Initialize socket connection
+        const token = localStorage.getItem('token');
+        if (token && !socketRef.current) {
+            socketRef.current = io(backendUrl, {
+                auth: { token },
+                transports: ['websocket']
+            });
+
+            // Register user with socket server
+            if (profile?._id) {
+                socketRef.current.emit('register', profile._id);
+            }
+
+            // Listen for user status updates
+            socketRef.current.on('user_status', (data) => {
+                setOnlineUsers(prev => ({
+                    ...prev,
+                    [data.userId]: {
+                        isOnline: data.isOnline,
+                        lastSeen: data.lastSeen
+                    }
+                }));
+            });
+        }
+
+        return () => {
+            // Clean up socket connection on unmount
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, [profile?._id]);
+
+    // Function to format last seen time
+    const formatLastSeen = (lastSeen) => {
+        if (!lastSeen) return '';
+        const date = new Date(lastSeen);
+        return `Last seen ${date.toLocaleString()}`;
+    };
 
     const filteredFriends = friends.filter(friend => 
         friend.username.toLowerCase().includes(searchQuery.toLowerCase())
@@ -126,24 +169,27 @@ export default function Contacts() {
                             />
                             <div className="contact-info">
                                 <div className="contact-header">
-                                    <span className="contact-username">{friend.username}</span>
-                                    {/* <span className="contact-time">12:30 PM</span> */}
-                                </div>
-                                <div className="contact-status">
-                                    <span className={`status-indicator ${friend.onlineStatus?.isOnline ? 'online' : 'offline'}`}>
-                                        {friend.onlineStatus?.isOnline ? '•' : ''}
-                                    </span>
-                                    <span className="last-message">
-                                        {friend.lastMessage ? 
-                                            `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}` 
-                                            : 'Start a new conversation'}
-                                    </span>
-                                    {friend.onlineStatus?.lastSeen && !friend.onlineStatus?.isOnline && (
-                                        <span className="last-seen">
-                                            {`Last seen ${new Date(friend.onlineStatus.lastSeen).toLocaleTimeString()}`}
+                                    <h4>{friend.username}</h4>
+                                    {onlineUsers[friend._id]?.isOnline ? (
+                                        <span className="online-status online">
+                                            <FaCircle className="status-icon" /> Online
+                                        </span>
+                                    ) : (
+                                        <span className="online-status offline" title={formatLastSeen(onlineUsers[friend._id]?.lastSeen)}>
+                                            <FaCircle className="status-icon" /> Offline
                                         </span>
                                     )}
                                 </div>
+                                <p className="last-message">
+                                    {friend.lastMessage ? 
+                                        `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}` 
+                                        : 'Start a new conversation'}
+                                </p>
+                                {!onlineUsers[friend._id]?.isOnline && onlineUsers[friend._id]?.lastSeen && (
+                                    <span className="last-seen">
+                                        {`Last seen ${new Date(onlineUsers[friend._id].lastSeen).toLocaleString()}`}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     ))
