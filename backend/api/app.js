@@ -10,6 +10,7 @@ const mongoUrl = process.env.MONGODB_URI;
 // MongoDB connection
 import connect from '../db/connection.js';
 connect(mongoUrl);
+
 // Routes
 import userRegister from '../route/user.register.js';
 import userLogin from '../route/user.login.js';
@@ -22,13 +23,10 @@ import notificationRoute from '../route/sendnotification.route.js';
 import spellCorrectRoute from '../route/messageImprovver.js';
 import messageRoute from '../route/message.route.js';
 import messageIpfsRoute from '../route/message.ipfs.js';
-import callRoute from '../route/call.route.js';
-import { initCallHandlers } from '../callHandler.js';
 const PORT = process.env.PORT || 5000;
 const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 const app = express();
 const server = http.createServer(app);
-app.use(cors())
 
 // CORS configuration
 const allowedOrigins = [frontend, 'http://localhost:5173', 'https://whisperlog.vercel.app'];
@@ -74,7 +72,6 @@ app.use('/notification', notificationRoute);
 app.use('/messageImprover', spellCorrectRoute);
 app.use('/message',messageRoute)
 app.use('/message/ipfs',messageIpfsRoute)
-app.use('/api/calls', callRoute);
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', {
     message: err.message,
@@ -430,8 +427,6 @@ io.on('connection', (socket) => {
   
 });
 
-// Initialize call handlers
-initCallHandlers(io);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://localhost:${PORT}`);

@@ -13,6 +13,13 @@ const Navbar = () => {
   if (location.pathname.includes("/chat")) {
     return null; // completely skip rendering
   }
+  const checking = localStorage.getItem("token")
+  const [login, setlogin] = useState(false)
+  useEffect(() => {
+    if (checking) {
+      setlogin(true)
+    }
+  }, [])
   return (
     <div className="navbar">
       <PillNav
@@ -23,7 +30,8 @@ const Navbar = () => {
           { href: "/profile", label: "Profile" },
           { href: "/chat", label: "Chat" },
           { href: "/addfriend", label: "Add Friend" },
-          {href:"/anonymouschat",label:"Anonymous Chat"}
+          { href: "/anonymouschat", label: "Anonymous Chat" },
+          { href:  login ? "/Profile": "/Login/SignUp" , label: `${login ? "Profile" : "Login/SignUp"}` }
         ]}
         activeHref="/"
         ease="power3.easeOut"
