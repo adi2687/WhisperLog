@@ -24,6 +24,7 @@ import Video from './components/message/video/video';
 import Join from './components/message/video/JoinRoom';
 import NotificationBell from './components/Notifications/NotificationBell';
 import Groups from './components/Groups/GroupList';
+import AnonymousChat from './components/Anonymous/AnonymousChat';
 // imp
 // Protected route component
 
@@ -58,6 +59,7 @@ function App() {
                     <Route path='/join' element={<Join />} />
                     <Route path='/notification' element={<NotificationBell />} />
                     <Route path='/groups' element={<Groups />} />
+                    <Route path='/anonymouschat' element={<AnonymousChat />} />
                   </Routes>
                   </main>
                   <Footer />

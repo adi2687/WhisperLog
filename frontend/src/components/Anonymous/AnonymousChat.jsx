@@ -21,10 +21,21 @@ export default function AnonymousChat() {
     // Generate anonymous ID
     const anonId = `anon_${Math.random().toString(36).substr(2, 9)}`;
     setAnonymousId(anonId);
+    console.log('🎭 Anonymous ID generated:', anonId);
+
+    // Check socket connection
+    if (socket.connected) {
+      console.log('✅ Socket connected:', socket.id);
+    } else {
+      console.log('❌ Socket not connected');
+      socket.on('connect', () => {
+        console.log('✅ Socket connected:', socket.id);
+      });
+    }
 
     // Socket listeners
     socket.on('anonymous_matched', ({ roomId, partnerId }) => {
-      console.log('Matched with partner:', partnerId);
+      console.log('🎉 Matched with partner:', partnerId, 'Room:', roomId);
       setRoomId(roomId);
       setPartnerId(partnerId);
       setIsSearching(false);
@@ -59,7 +70,7 @@ export default function AnonymousChat() {
         socket.emit('leave_anonymous', { roomId, userId: anonymousId });
       }
     };
-  }, [anonymousId, roomId]);
+  }, [roomId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -68,6 +79,16 @@ export default function AnonymousChat() {
   const handleStartChat = () => {
     setIsSearching(true);
     socket.emit('find_anonymous_partner', { userId: anonymousId });
+    
+    // Auto-match timeout for testing (remove in production)
+    setTimeout(() => {
+      if (isSearching && !isConnected) {
+        console.log('Still searching after 5 seconds - check if backend is running');
+        toast.error('No strangers available. Try opening another window!', {
+          duration: 5000
+        });
+      }
+    }, 5000);
   };
 
   const handleSendMessage = (e) => {

@@ -6,12 +6,12 @@ import NotificationBell from '../Notifications/NotificationBell';
 import ThemeToggle from '../message/ThemeToggle';
 import { useLocation } from 'react-router-dom';
 const Navbar = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const checking = localStorage.getItem("token")
   const [login, setlogin] = useState(false)
   
   useEffect(() => {
+    console.log(checking,login)
     if (checking) {
       setlogin(true)
     }
@@ -28,11 +28,11 @@ const Navbar = () => {
         logoAlt="WhisperLog Logo"
         items={[
           { href: "/", label: "Home" },
-          { href: "/profile", label: "Profile" },
           { href: "/chat", label: "Chat" },
+          {href:"Groups",label:"Group"},
           { href: "/addfriend", label: "Add Friend" },
           { href: "/anonymouschat", label: "Anonymous Chat" },
-          { href:  login ? "/Profile": "/Login/SignUp" , label: `${login ? "Profile" : "Login/SignUp"}` }
+          { href:  login ? "/Profile": "/auth" , label: `${login ? "Profile" : "Login/SIgnUp"}` }
         ]}
         activeHref="/"  
         ease="power3.easeOut"
