@@ -22,8 +22,10 @@ import Message from './components/message/main';
 import Aurora from './pages/main';
 import Video from './components/message/video/video'; 
 import Join from './components/message/video/JoinRoom';
-
-
+import NotificationBell from './components/Notifications/NotificationBell';
+import VoiceCall from './components/Call/VoiceCall';
+import VideoCall from './components/Call/VideoCall';
+import IncomingCall from './components/Call/IncomingCall';
 // imp
 // Protected route component
 
@@ -38,6 +40,7 @@ function App() {
           <ProfileProvider>
             <CurrentUserProfileProvider>
                 <div className="app">
+                  <IncomingCall />
                   <Navbar />
                   <main>
                   <Routes>
@@ -56,6 +59,9 @@ function App() {
                     <Route path='/aurora' element={<Aurora />} />
                     <Route path='/video' element={<Video />} />
                     <Route path='/join' element={<Join />} />
+                    <Route path='/notification' element={<NotificationBell />} />
+                    <Route path='/voice-call/:callId' element={<VoiceCall />} />
+                    <Route path='/video-call/:callId' element={<VideoCall />} />
                   </Routes>
                   </main>
                   <Footer />

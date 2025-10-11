@@ -110,7 +110,7 @@ const ProfileContent = () => {
             <div className="profile-picture">
               {profile.profilePicture ? (
                 <img 
-                  src={profile.profilePicture} 
+                  src={profile.profilePicture || '/default-avatar.svg'} 
                   alt={profile.username}
                   onError={(e) => {
                     e.target.onerror = null;
@@ -118,10 +118,12 @@ const ProfileContent = () => {
                     e.target.nextSibling.style.display = 'flex';
                   }}
                 />
-              ) : null}
-              <div className="default-avatar">
+              ) : (
+                <div className="default-avatar">
                 {profile.username?.charAt(0)?.toUpperCase() || 'U'}
               </div>
+              )}
+              
             </div>
           </div>
           <h1 className="username">{profile.username}</h1>
@@ -204,7 +206,7 @@ const ProfileContent = () => {
                       className="friend-card"
                       onClick={() => navigate(`/profile/${friend.username}`)}
                     >
-                      <img src={friend.avatar} alt={friend.name} className="friend-avatar" />
+                      <img src={friend.avatar || '/default-avatar.svg'} alt={friend.name} className="friend-avatar" />
                       <span className="friend-name">{friend.name}</span>
                     </div>
                   ))}

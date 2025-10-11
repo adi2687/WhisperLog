@@ -23,19 +23,19 @@ export default function Contacts() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.friends) {
-                // console.log('freidn s aya',data.friends)
-                setFriends(data.friends);
-            }
-        })
-        .catch(error => console.error('Error fetching friends:', error));
+            .then(res => res.json())
+            .then(data => {
+                if (data.friends) {
+                    // console.log('freidn s aya',data.friends)
+                    setFriends(data.friends);
+                }
+            })
+            .catch(error => console.error('Error fetching friends:', error));
     };
 
     useEffect(() => {
         getFriends();
-        
+
         // Initialize socket connection
         const token = localStorage.getItem('token');
         if (token && !socketRef.current) {
@@ -77,26 +77,26 @@ export default function Contacts() {
         return `Last seen ${date.toLocaleString()}`;
     };
 
-    const filteredFriends = friends.filter(friend => 
+    const filteredFriends = friends.filter(friend =>
         friend.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    const findchatid=(receiverId,receiver)=>{
-        fetch(`${backendUrl}/message/findid`,{
-            method:'POST',
-            headers:{
-                'Content-Type':'application/json',
-                'Authorization':`Bearer ${localStorage.getItem('token')}`
+    const findchatid = (receiverId, receiver) => {
+        fetch(`${backendUrl}/message/findid`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body:JSON.stringify({senderId:profile._id,receiverId:receiverId})
-        }   )
-        .then(res=>res.json())
-        .then(data=>{
-            // console.log(data,receiver)
-            if (data.chatId){
-                navigate(`/chat/${data.chatId}`, { state: { receiver: receiverId,receiverUsername:receiver } });
-            }
+            body: JSON.stringify({ senderId: profile._id, receiverId: receiverId })
         })
-        .catch(error=>console.error('Error fetching chat id:',error))
+            .then(res => res.json())
+            .then(data => {
+                // console.log(data,receiver)
+                if (data.chatId) {
+                    navigate(`/chat/${data.chatId}`, { state: { receiver: receiverId, receiverUsername: receiver } });
+                }
+            })
+            .catch(error => console.error('Error fetching chat id:', error))
     }
     if (loading) return (
         <div className="contacts-container">
@@ -118,7 +118,7 @@ export default function Contacts() {
         </div>
     );
 
-    
+
     return (
         <div className="contacts-container">
             <div className="contacts-header">
@@ -128,16 +128,16 @@ export default function Contacts() {
                 </h2>
             </div>
             <div className='action-buttons'>
-            <button className="add-contact-button" onClick={() => navigate('/addfriend')}>
-                <FaUserFriends />
-                Add Contact
-            </button>
-            <button className="add-contact-button" onClick={() => navigate('/profile')}>
-                <FaUser />
-                Profile
-            </button>
+                <button className="add-contact-button" onClick={() => navigate('/addfriend')}>
+                    <FaUserFriends />
+                    Add Contact
+                </button>
+                <button className="add-contact-button" onClick={() => navigate('/profile')}>
+                    <FaUser />
+                    Profile
+                </button>
             </div>
-            
+
             <div className="search-bar">
                 <div className="search-input">
                     <FaSearch className="search-icon" />
@@ -153,10 +153,10 @@ export default function Contacts() {
             <div className="contacts-list">
                 {filteredFriends.length > 0 ? (
                     filteredFriends.map((friend) => (
-                        <div 
-                            key={friend._id} 
+                        <div
+                            key={friend._id}
                             className={`contact-item ${activeChatId === friend._id ? 'active' : ''}`}
-                            onClick={()=>findchatid(friend._id,friend)}
+                            onClick={() => findchatid(friend._id, friend)}
                         >
                             <img
                                 src={friend.profilePicture || '/default-avatar.svg'}
@@ -181,10 +181,11 @@ export default function Contacts() {
                                     )}
                                 </div>
                                 <p className="last-message">
-                                    {friend.lastMessage ? 
-                                        `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}` 
+                                    {friend.lastMessage ?
+                                        `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}`
                                         : 'Start a new conversation'}
                                 </p>
+
                                 {!onlineUsers[friend._id]?.isOnline && onlineUsers[friend._id]?.lastSeen && (
                                     <span className="last-seen">
                                         {`Last seen ${new Date(onlineUsers[friend._id].lastSeen).toLocaleString()}`}

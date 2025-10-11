@@ -1,83 +1,349 @@
-/* Main container styles */
+/* ========================================
+   MAIN CONTAINER
+   ======================================== */
+
 .main-container {
-  display: flex;
-  flex-direction: column;
   width: 100%;
+  height: 100vh;
   overflow: hidden;
-  background-color: #121212;
-  height:100vh;
-  margin-top:0;
+  background: #000000;
+  position: absolute;
+
+  top:0px;
 }
+
+/* ========================================
+   MAIN CONTENT LAYOUT
+   ======================================== */
 
 .main-content {
-  display: flex;
-  flex: 1;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  height: 100vh;
+  overflow: hidden;
+  transition: grid-template-columns 0.3s ease;
+}
+
+/* ========================================
+   PANELS
+   ======================================== */
+
+.contacts-panel {
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+.chat-panel {
+  background: #1a1a1a;
   overflow: hidden;
   position: relative;
-  height: 100%;
 }
 
-.contacts-panel,
-.chat-panel {
-  transition: transform 0.3s ease-in-out;
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
+/* ========================================
+   RESPONSIVE LAYOUT - TABLET
+   ======================================== */
+
+@media (max-width: 1024px) {
+  .main-content {
+    grid-template-columns: 320px 1fr;
+  }
 }
 
-/* Responsive layout for mobile */
+/* ========================================
+   RESPONSIVE LAYOUT - MOBILE
+   ======================================== */
+
 @media (max-width: 768px) {
+  .main-content {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+
   .contacts-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     transform: translateX(0);
-    z-index: 2;
+    transition: transform 0.3s ease;
+    z-index: 20;
   }
-  .main-container{
-    position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    height: 100svh;
-  }
+
   .chat-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     transform: translateX(100%);
-    z-index: 1;
+    transition: transform 0.3s ease;
+    z-index: 10;
   }
-  
-  .contacts-panel.active {
-    transform: translateX(0);
-  }
-  
-  .chat-panel.active {
-    transform: translateX(0);
-  }
-  
+
+  /* When chat is active on mobile */
   .main-content.chat-active .contacts-panel {
     transform: translateX(-100%);
   }
-  
+
   .main-content.chat-active .chat-panel {
+    transform: translateX(0);
+  }
+
+  /* Alternative: Show only active panel */
+  .contacts-panel:not(.active) {
+    display: none;
+  }
+
+  .chat-panel:not(.active) {
+    display: none;
+  }
+
+  .contacts-panel.active {
+    display: block;
+    transform: translateX(0);
+  }
+
+  .chat-panel.active {
+    display: block;
     transform: translateX(0);
   }
 }
 
-/* For larger screens */
-@media (min-width: 769px) {
+/* ========================================
+   EMPTY STATE
+   ======================================== */
+
+.empty-chat-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+  color: #999999;
+}
+
+.empty-chat-state svg {
+  font-size: 80px;
+  margin-bottom: 24px;
+  opacity: 0.5;
+  color: #cccccc;
+}
+
+.empty-chat-state h3 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  color: #cccccc;
+}
+
+.empty-chat-state p {
+  margin: 0;
+  font-size: 16px;
+  max-width: 400px;
+  color: #999999;
+}
+
+/* ========================================
+   LOADING STATE
+   ======================================== */
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #cccccc;
+}
+
+/* ========================================
+   BACK BUTTON (MOBILE)
+   ======================================== */
+
+.back-button {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.9);
+  border: none;
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.back-button:hover {
+  background: rgba(26, 26, 26, 0.95);
+}
+
+.back-button svg {
+  font-size: 20px;
+}
+
+@media (max-width: 768px) {
+  .back-button {
+    display: flex;
+  }
+}
+
+/* ========================================
+   SPLIT VIEW ADJUSTMENTS
+   ======================================== */
+
+.main-content:not(.chat-active) .chat-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dark mode styles are now handled by CSS variables in theme.css */
+
+/* ========================================
+   SMOOTH TRANSITIONS
+   ======================================== */
+
+.main-content,
+.contacts-panel,
+.chat-panel {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   ACCESSIBILITY
+   ======================================== */
+
+.back-button:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+   EXTRA SMALL SCREENS
+   ======================================== */
+
+@media (max-width: 480px) {
+  .empty-chat-state {
+    padding: 20px;
+  }
+
+  .empty-chat-state svg {
+    font-size: 60px;
+  }
+
+  .empty-chat-state h3 {
+    font-size: 20px;
+  }
+
+  .empty-chat-state p {
+    font-size: 14px;
+  }
+
+  .loading-spinner {
+    width: 50px;
+    height: 50px;
+    border-width: 3px;
+  }
+
+  .loading-text {
+    font-size: 14px;
+  }
+
+  .back-button {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .back-button svg {
+    font-size: 18px;
+  }
+}
+
+/* ========================================
+   LANDSCAPE MODE (MOBILE)
+   ======================================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+  .main-content {
+    grid-template-columns: 280px 1fr;
+  }
+
   .contacts-panel {
     position: relative;
-    flex: 0 0 350px;
-    border-right: 1px solid #333;
-    transform: none !important;
+    transform: translateX(0);
   }
-  
+
   .chat-panel {
     position: relative;
-    flex: 1;
-    transform: none !important;
+    transform: translateX(0);
+  }
+
+  .contacts-panel:not(.active),
+  .chat-panel:not(.active) {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) and (orientation: landscape) {
+  .main-content {
+    grid-template-columns: 240px 1fr;
+  }
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+@media print {
+  .contacts-panel {
+    display: none;
+  }
+
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel {
+    position: static;
+    transform: none;
   }
 }

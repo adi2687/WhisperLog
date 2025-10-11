@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiCamera } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiCamera, FiInfo, FiArrowLeft } from 'react-icons/fi';
 import { FaMagic, FaSpinner } from 'react-icons/fa';
 
 import { format } from 'date-fns';
@@ -11,8 +11,9 @@ import './GifPicker.css';
 import ProfileCard from '../profile/profilecard/card';
 import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
-import Aurora from '../../pages/Aurora'
-
+import Aurora from '../../pages/Aurora';
+import IpfsInfo from './IpfsInfo';
+import { useNavigate } from 'react-router-dom';
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
 export default function Message({ receiverDetails, onBack }) {
@@ -43,6 +44,8 @@ export default function Message({ receiverDetails, onBack }) {
   const [isListening, setIsListening] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState(null);
+  const [method, setmethod] = useState("normal");
+  const [showIpfsInfo, setShowIpfsInfo] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -51,6 +54,10 @@ export default function Message({ receiverDetails, onBack }) {
 
   const [imageshow, setimageshow] = useState("")
   // Update receiver if props or location changes
+
+  const navigate = useNavigate();
+
+
   useEffect(() => {
     if (receiver) setCurrentReceiver(receiver);
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
@@ -60,17 +67,17 @@ export default function Message({ receiverDetails, onBack }) {
   useEffect(() => {
     const fetchUserStatus = async () => {
       if (!currentReceiver) return;
-      
+
       try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/${currentReceiver}/status`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/status/${currentReceiver}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
-        
         if (response.ok) {
           const data = await response.json();
-          setIsOnline(data.isOnline);
+          console.log('status', data.status)
+          setIsOnline(data.status);
           setLastSeen(data.lastSeen);
         }
       } catch (error) {
@@ -106,53 +113,10 @@ export default function Message({ receiverDetails, onBack }) {
   }, [socket, currentReceiver, user?._id]);
 
   // Fetch user status when receiver changes
-  useEffect(() => {
-    const fetchUserStatus = async () => {
-      if (!currentReceiver) return;
-      
-      try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/users/${currentReceiver}/status`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setIsOnline(data.isOnline);
-          setLastSeen(data.lastSeen);
-        }
-      } catch (error) {
-        console.error('Error fetching user status:', error);
-      }
-    };
 
-    fetchUserStatus();
-  }, [currentReceiver]);
 
   // Handle user status updates from socket
-  useEffect(() => {
-    if (!socket) return;
 
-    const handleUserStatus = (data) => {
-      if (data.userId === currentReceiver) {
-        setIsOnline(data.isOnline);
-        setLastSeen(data.lastSeen);
-      }
-    };
-
-    // Listen for status updates
-    socket.on('user_status', handleUserStatus);
-
-    // Register current user with socket server
-    if (user?._id) {
-      socket.emit('register', user._id);
-    }
-
-    return () => {
-      socket.off('user_status', handleUserStatus);
-    };
-  }, [socket, currentReceiver, user?._id]);
 
   // Format last seen time
   const formatLastSeen = (timestamp) => {
@@ -166,7 +130,7 @@ export default function Message({ receiverDetails, onBack }) {
     if (chatId) {
       console.log('Joining chat:', chatId);
       socket.emit('join_room', { roomId: chatId, userId: user?._id });
-      
+
       // Register user with socket server for online status
       if (user?._id) {
         socket.emit('register', user._id);
@@ -326,24 +290,39 @@ export default function Message({ receiverDetails, onBack }) {
       let endpoint = 'upload-file';
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000'; // Fallback URL
 
+      // Check if using IPFS
+      const usingIpfs = method && method === "ipfs";
+
       // Add file to form data based on type
       if (type === 'image') {
         if (typeof file === 'string') {
           return { imageUrl: file }; // Return GIF URL directly
         }
         endpoint = 'upload-image';
-        uploadFormData.append('image', file);
+        // IPFS expects 'file' field, not 'image'
+        uploadFormData.append(usingIpfs ? 'file' : 'image', file);
       } else if (type === 'video') {
         endpoint = 'upload-video';
-        uploadFormData.append('video', file);
-        uploadFormData.append('fileName', file.name);
-        uploadFormData.append('fileType', file.type);
-        uploadFormData.append('fileSize', file.size);
+        // IPFS expects 'file' field, not 'video'
+        uploadFormData.append(usingIpfs ? 'file' : 'video', file);
+        if (!usingIpfs) {
+          uploadFormData.append('fileName', file.name);
+          uploadFormData.append('fileType', file.type);
+          uploadFormData.append('fileSize', file.size);
+        }
       } else {
         uploadFormData.append('file', file);
       }
 
-      const url = `${backendUrl}/message/${endpoint}`;
+      let url = `${backendUrl}/message/${endpoint}`;
+      console.log('Upload method:', method);
+
+      // Use IPFS for secure uploads
+      if (usingIpfs) {
+        url = `${backendUrl}/message/ipfs/media`;
+        console.log('Using IPFS for secure upload');
+      }
+
       console.log(`Uploading ${type} to:`, url);
       console.log('Request headers:', {
         'Authorization': `Bearer ${localStorage.getItem('token') ? '***' : 'No token found'}`,
@@ -411,7 +390,22 @@ export default function Message({ receiverDetails, onBack }) {
       }
 
       console.log('Upload successful:', responseData);
-      setSelectedVideo(null)
+      setSelectedVideo(null);
+
+      // Handle IPFS response format
+      if (usingIpfs && responseData.cid) {
+        // Convert IPFS response to standard format
+        return {
+          imageUrl: responseData.url,
+          videoUrl: responseData.url,
+          fileUrl: responseData.url,
+          cid: responseData.cid,
+          fileName: responseData.fileName,
+          fileType: responseData.fileType,
+          isIpfs: true
+        };
+      }
+
       return responseData;
 
     } catch (error) {
@@ -452,6 +446,7 @@ export default function Message({ receiverDetails, onBack }) {
   };
 
   const handleSendMessage = async (e) => {
+
     e.preventDefault();
     if ((!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading) return;
 
@@ -517,12 +512,24 @@ export default function Message({ receiverDetails, onBack }) {
       // Handle file upload if exists
       else if (selectedFile) {
         const result = await handleFileUpload(selectedFile, 'file');
+        console.log('File upload result:', result);
+
+        // Extract URL from various possible response formats
+        const fileUrl = result.url || result.secure_url || result.fileUrl || result.data?.url || result.data?.secure_url;
+
+        if (!fileUrl) {
+          console.error('No file URL in upload response:', result);
+          throw new Error('File upload failed: No URL returned from server');
+        }
+
         fileData = {
-          fileUrl: result.url || result.secure_url,
+          fileUrl: fileUrl,
           fileName: selectedFile.name,
           fileType: selectedFile.type,
           fileSize: selectedFile.size
         };
+
+        console.log('File data prepared:', fileData);
       }
 
       // Create the final message object
@@ -539,6 +546,16 @@ export default function Message({ receiverDetails, onBack }) {
           msg._id === tempMessageId ? finalMessage : msg
         )
       );
+
+      // Debug log for file messages
+      if (fileData) {
+        console.log('Sending file message:', {
+          fileUrl: fileData.fileUrl,
+          fileName: fileData.fileName,
+          fileType: fileData.fileType,
+          fileSize: fileData.fileSize
+        });
+      }
 
       // Emit the message via socket
       socket.emit('message', {
@@ -563,20 +580,18 @@ export default function Message({ receiverDetails, onBack }) {
           )
         );
       }, 1000);
-
       // Cleanup on component unmount
       return () => clearTimeout(ackTimeout);
     } catch (error) {
       console.error('Error sending message:', error);
-      // Update message status to show error
-      setChat(prev =>
-        prev.map(msg =>
-          msg._id === tempMessageId
-            ? { ...msg, status: 'error', error: error.message }
-            : msg
-        )
-      );
-      alert(error.message || 'Failed to send message');
+      setIsUploading(false);
+
+      // Remove the failed message from chat
+      setChat(prev => prev.filter(msg => msg._id !== tempMessageId));
+
+      // Show user-friendly error message
+      const errorMsg = error.message || 'Failed to send message';
+      alert(`❌ ${errorMsg}\n\nPlease try again.`);
     } finally {
       setIsUploading(false);
     }
@@ -632,6 +647,14 @@ export default function Message({ receiverDetails, onBack }) {
         fileName: msg.fileName || null,
         fileType: msg.fileType || null,
         fileSize: msg.fileSize || null,
+
+        // Debug log for file messages
+        ...(msg.fileUrl && console.log('Received file message:', {
+          fileUrl: msg.fileUrl,
+          fileName: msg.fileName,
+          fileType: msg.fileType,
+          fileSize: msg.fileSize
+        }) || {}),
         imageUrl: msg.imageUrl || null,
         senderId: msg.senderId || null,
         receiverId: msg.receiverId || null,
@@ -721,9 +744,9 @@ export default function Message({ receiverDetails, onBack }) {
         isSystemMessage: true,
         status: 'delivered'
       };
-      
+
       setChat(prev => [...prev, screenshotNotification]);
-      
+
       // Notify other users in the chat
       if (socket && chatId) {
         socket.emit('system_message', {
@@ -739,7 +762,7 @@ export default function Message({ receiverDetails, onBack }) {
     // Use both keyup (for Print Screen) and keydown (for other shortcuts)
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('keydown', handleKeyDown);
@@ -815,7 +838,7 @@ export default function Message({ receiverDetails, onBack }) {
 
     const backend = import.meta.env.VITE_BACKEND_URL;
     const token = localStorage.getItem('token');
-    
+
     console.log('Sending translation request to:', `${backend}/messageImprover/translate`);
     console.log('Auth token exists:', !!token);
 
@@ -832,7 +855,7 @@ export default function Message({ receiverDetails, onBack }) {
       });
 
       console.log('Translation response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
@@ -849,7 +872,7 @@ export default function Message({ receiverDetails, onBack }) {
         ...prev,
         [messageId]: data.corrected_sentence
       }));
-      
+
     } catch (error) {
       console.error('Translation error:', error);
       // On error, show original message but log the error
@@ -857,10 +880,10 @@ export default function Message({ receiverDetails, onBack }) {
         ...prev,
         [messageId]: msg.message
       }));
-      
+
       // Show error to user (you might want to use a toast or other UI element)
       alert(`Translation failed: ${error.message}`);
-      
+
     } finally {
       setLoadingTranslations(prev => ({
         ...prev,
@@ -937,20 +960,60 @@ export default function Message({ receiverDetails, onBack }) {
         );
       }
 
-      // Regular file download
+      // Regular file download/view
+      const fileExtension = msg.fileName?.split('.').pop()?.toLowerCase();
+      const isViewable = ['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(fileExtension);
+
+      const handleFileClick = (e) => {
+        e.stopPropagation();
+        if (isViewable && fileExtension === 'pdf') {
+          // Open PDF in new tab for viewing
+          window.open(msg.fileUrl, '_blank');
+        } else if (isViewable) {
+          // Use Google Docs Viewer for Office files
+          window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(msg.fileUrl)}&embedded=true`, '_blank');
+        } else {
+          // Direct download for other files
+          window.open(msg.fileUrl, '_blank');
+        }
+      };
+
+      const handleDownload = (e) => {
+        e.stopPropagation();
+        const link = document.createElement('a');
+        link.href = msg.fileUrl;
+        link.download = msg.fileName || 'download';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
       return (
-        <div className="message-file" onClick={() => window.open(msg.fileUrl, '_blank')}>
+        <div className="message-file">
           <div className="file-icon">{getFileIcon(msg.fileName || 'file')}</div>
           <div className="file-info">
-            <div className="user-name">{currentReceiverDetails?.username || 'Unknown User'}</div>
-            <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
-              {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
-            </div>
             <div className="file-name" title={msg.fileName}>
               {msg.fileName || 'Download file'}
             </div>
             <div className="file-size">
-              {msg.fileSize ? formatFileSize(msg.fileSize) : 'Click to view'}
+              {msg.fileSize ? formatFileSize(msg.fileSize) : 'Unknown size'}
+            </div>
+            <div className="file-actions">
+              <button
+                className="file-action-btn view-btn"
+                onClick={handleFileClick}
+                title={isViewable ? 'View file' : 'Open file'}
+              >
+                {isViewable ? 'View' : ' Open'}
+              </button>
+              <button
+                className="file-action-btn download-btn"
+                onClick={handleDownload}
+                title="Download file"
+              >
+                Download
+              </button>
             </div>
           </div>
         </div>
@@ -983,57 +1046,57 @@ export default function Message({ receiverDetails, onBack }) {
             </div>
           )}
         </div>
-        
+
         <div className="message-footer">
           <span className="message-time">
             {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
           </span>
           {msg.senderId === receiver && (
             <div className="message-actions">
-            <button
-              className={`menu-dot ${showMenu ? 'active' : ''}`}
-              onClick={(e) => toggleMenu(messageId, e)}
-              aria-label="Message actions"
-              aria-expanded={showMenu}
-            >
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
-            {showMenu && (
-              <div className="message-dropdown" ref={menuRef}>
-                <button 
-                  className="dropdown-item" 
-                  onClick={() => { 
-                    translateMessage(msg); 
-                    setMenuOpen(null); 
-                  }} 
-                  disabled={isLoading}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12.87 15.07L10 12.28V12.28C9.4 11.74 8.31 11.78 7.76 12.38C7.21 12.97 7.25 14 7.86 14.63L11.3 18.07C11.69 18.46 12.32 18.46 12.71 18.07L16.15 14.63C16.74 14.04 16.8 13.02 16.27 12.38C15.74 11.74 14.65 11.75 14.09 12.32L12.86 13.56" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M8.5 10.19L10.38 12.07L12.26 10.19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M8.5 8.5H8.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M11.5 8.5H11.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14.5 8.5H14.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span>{isLoading ? 'Translating...' : isTranslated ? 'Show Original' : 'Translate to English'}</span>
-                </button>
-                <button className="dropdown-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M18 8L21 11M21 11L18 14M21 11H3M13 3C9.13401 3 6 6.13401 6 10V11M6 21H10M6 21L3 18M6 21L9 18M18 18L15 21M18 21H14M18 21L21 18M10 3C13.866 3 17 6.13401 17 10V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>Forward</span>
-                </button>
-                <button className="dropdown-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M19 7L18.1327 19.1125C18.0579 20.1891 17.187 21.0709 16.1108 21.1055C15.9159 21.1129 15.5 21.1129 15.5 21.1129C15.5 21.1129 14.5 21.1129 14.5 20.1129C14.5 19.1129 14.5 17.5 14.5 17.5M14.5 17.5H17.5M14.5 17.5H9.5M9.5 17.5H4.5M9.5 17.5V20.5C9.5 21.5 8.5 21.5 8.5 21.5H5.5C4.5 21.5 4.5 20.5 4.5 20.5V17.5M9.5 17.5H4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M10.5 10.5L15.5 5.5M15.5 5.5L10.5 0.5M15.5 5.5H1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span>Reply</span>
-                </button>
-              </div>
-            )}
+              <button
+                className={`menu-dot ${showMenu ? 'active' : ''}`}
+                onClick={(e) => toggleMenu(messageId, e)}
+                aria-label="Message actions"
+                aria-expanded={showMenu}
+              >
+                <span></span>
+                <span></span>
+                <span></span>
+              </button>
+              {showMenu && (
+                <div className="message-dropdown" ref={menuRef}>
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      translateMessage(msg);
+                      setMenuOpen(null);
+                    }}
+                    disabled={isLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12.87 15.07L10 12.28V12.28C9.4 11.74 8.31 11.78 7.76 12.38C7.21 12.97 7.25 14 7.86 14.63L11.3 18.07C11.69 18.46 12.32 18.46 12.71 18.07L16.15 14.63C16.74 14.04 16.8 13.02 16.27 12.38C15.74 11.74 14.65 11.75 14.09 12.32L12.86 13.56" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M8.5 10.19L10.38 12.07L12.26 10.19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M8.5 8.5H8.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M11.5 8.5H11.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M14.5 8.5H14.51" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{isLoading ? 'Translating...' : isTranslated ? 'Show Original' : 'Translate to English'}</span>
+                  </button>
+                  <button className="dropdown-item">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M18 8L21 11M21 11L18 14M21 11H3M13 3C9.13401 3 6 6.13401 6 10V11M6 21H10M6 21L3 18M6 21L9 18M18 18L15 21M18 21H14M18 21L21 18M10 3C13.866 3 17 6.13401 17 10V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Forward</span>
+                  </button>
+                  <button className="dropdown-item">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19 7L18.1327 19.1125C18.0579 20.1891 17.187 21.0709 16.1108 21.1055C15.9159 21.1129 15.5 21.1129 15.5 21.1129C15.5 21.1129 14.5 21.1129 14.5 20.1129C14.5 19.1129 14.5 17.5 14.5 17.5M14.5 17.5H17.5M14.5 17.5H9.5M9.5 17.5H4.5M9.5 17.5V20.5C9.5 21.5 8.5 21.5 8.5 21.5H5.5C4.5 21.5 4.5 20.5 4.5 20.5V17.5M9.5 17.5H4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10.5 10.5L15.5 5.5M15.5 5.5L10.5 0.5M15.5 5.5H1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    <span>Reply</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1209,40 +1272,52 @@ export default function Message({ receiverDetails, onBack }) {
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
       <div className="chat-content">
-      <div className="chat-header">
-        <div className="chat-header-info">
-          <h3>{currentReceiverDetails?.username || 'Chat'}</h3>
-          <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
-            {isOnline ? 'Online' : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
+        <div className="chat-header">
+          <button onClick={() => navigate('/chat')} className="back-buttonchat">
+            <FiArrowLeft size={18} />
+            <span>Back</span>
+
+            <div className={`user-status ${isOnline ? 'online' : 'offline'}`}>
+              {isOnline === "online" ? 'Online' : lastSeen === "lastSeen" ? `Last seen ${new Date(lastSeen).toLocaleString()}` : 'Offline'}
+            </div>
+          </button>
+          <div className="chat-header-info">
+
+            <div>
+              <img src={currentReceiverDetails?.profilePicture || '/default-avatar.svg'} alt="Profile" 
+              onClick={()=>navigate(`/profile/${currentReceiverDetails?._id}`)}/>
+              <h3>{currentReceiverDetails?.username || 'Chat'}</h3>
+              
+            </div>
+            
           </div>
         </div>
-      </div>
-      {/* Image Preview Modal */}
-      {imageshow && (
-        <div className="image-preview-modal" onClick={() => setimageshow(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="close-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setimageshow(false);
-              }}
-              aria-label="Close image"
-            >
-              &times;
-            </button>
-            <div className="image-container">
-              <img 
-                src={imageshow} 
-                alt="Full size preview" 
-                onClick={(e) => e.stopPropagation()}
-              />
+        {/* Image Preview Modal */}
+        {imageshow && (
+          <div className="image-preview-modal" onClick={() => setimageshow(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <button
+                className="close-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setimageshow(false);
+                }}
+                aria-label="Close image"
+              >
+                &times;
+              </button>
+              <div className="image-container">
+                <img
+                  src={imageshow}
+                  alt="Full size preview"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="chat-box">
+        <div className="chat-box">
           {chat.length > 0 ? (
             chat.map((msg, index) => (
               <div
@@ -1345,17 +1420,19 @@ export default function Message({ receiverDetails, onBack }) {
           </div>
         )}
       </div>
-      
+
       <div className="chat-input-container">
-        <div className={`input-icons ${isMenuExpanded ? 'expanded' : ''}`}>
+        {/* Left Section: Attachments */}
+        <div className="input-left-section">
           <button
             className="menu-toggle"
             onClick={() => setIsMenuExpanded(!isMenuExpanded)}
-            title="More options"
+            title={isMenuExpanded ? 'Close attachments' : 'Add attachments'}
           >
             <FiPaperclip size={20} />
           </button>
-          <div className="menu-options">
+
+          <div className={`menu-options ${isMenuExpanded ? 'expanded' : ''}`}>
             <div className="file-input-wrapper">
               <input
                 type="file"
@@ -1373,12 +1450,16 @@ export default function Message({ receiverDetails, onBack }) {
             <button
               type="button"
               className="attachment-btn"
-              onClick={() => setShowGifPicker(!showGifPicker)}
+              onClick={() => {
+                console.log(showGifPicker)
+                setShowGifPicker(!showGifPicker)
+              }}
               disabled={isUploading || selectedFile || selectedImage}
               title="Send GIF"
             >
               <FiGift size={20} />
             </button>
+
 
             {showGifPicker && (
               <div className="gif-picker">
@@ -1396,13 +1477,15 @@ export default function Message({ receiverDetails, onBack }) {
                   {gifs.map((gif) => (
                     <img
                       key={gif.id}
-                      src={gif.images.fixed_height_small.url}
+                      src={gif.images.fixed_height.url}
                       alt={gif.title}
                       className="gif-item"
                       onClick={() => handleGifSelect(gif)}
                     />
                   ))}
                 </div>
+                <div className="gif-close" onClick={() => setShowGifPicker(false)} />
+                  
               </div>
             )}
 
@@ -1433,35 +1516,75 @@ export default function Message({ receiverDetails, onBack }) {
               </label>
             </div>
           </div>
+
         </div>
 
-        <div className="input-wrapper">
-          <input
-            ref={inputRef}
-            type="text"
-            value={message}
-            onChange={handleMessageChange}
-            onKeyDown={handleKeyDown}
-            placeholder={selectedImage || selectedFile ? 'Add a caption...' : 'Type a message...'}
-            className="chat-input"
-            disabled={isUploading}
-          />
+        {/* Center Section: Input Field */}
+        <div className="input-center-section">
+          <div className="input-wrapper">
+            <input
+              ref={inputRef}
+              type="text"
+              value={message}
+              onChange={handleMessageChange}
+              onKeyDown={handleKeyDown}
+              placeholder={selectedImage || selectedFile ? 'Add a caption...' : 'Type a message...'}
+              className="chat-input"
+              disabled={isUploading}
+            />
+          </div>
+        </div>
+
+        {/* Right Section: Actions */}
+        <div className="input-right-section">
+          {/* IPFS Toggle */}
+          <div className="ipfs-controls">
+            <button
+              className={`ipfs-toggle-btn ${method === "ipfs" ? 'active' : ''}`}
+              onClick={() => {
+                const newMethod = method === "ipfs" ? "normal" : "ipfs";
+                setmethod(newMethod);
+                console.log('Upload method changed to:', newMethod);
+              }}
+              title={method === "ipfs" ? "Using IPFS secure upload" : "Click to use IPFS secure upload"}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              {method === "ipfs" ? "IPFS" : "Normal"}
+            </button>
+            {method === "ipfs" && (
+              <button
+                className="ipfs-info-btn-trigger"
+                onClick={() => setShowIpfsInfo(true)}
+                title="Learn about IPFS"
+                aria-label="IPFS Information"
+              >
+                <FiInfo size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* AI Correct Button */}
           <button
             onClick={handleCorrectMessage}
             className={`correct-btn ${correcting ? 'correcting' : ''}`}
             disabled={isUploading || correcting}
             title="Improve your message with AI"
           >
-            {correcting ? (
-              <>
-                <FaSpinner className="spinner" />
-              </>
-            ) : (
-              <>
-                <FaMagic size={20} />
-              </>
-            )}
+            {correcting ? <FaSpinner className="spinner" /> : <FaMagic size={18} />}
           </button>
+
+          {/* Voice Input */}
           <div className="voice-input-container">
             {isListening && (
               <div className="recording-indicator">
@@ -1476,23 +1599,23 @@ export default function Message({ receiverDetails, onBack }) {
               disabled={isUploading}
               title={isListening ? 'Stop listening' : 'Voice input'}
             >
-              <FiMic size={20} className={isListening ? 'pulse' : ''} />
+              <FiMic size={18} className={isListening ? 'pulse' : ''} />
             </button>
           </div>
-        </div>
 
-        <button
-          onClick={handleSendMessage}
-          className="send-btn"
-          disabled={(!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading}
-        >
-          {isUploading ? (
-            <div className="spinner"></div>
-          ) : (
-            <FiSend size={20} />
-          )}
-        </button>
+          {/* Send Button */}
+          <button
+            onClick={handleSendMessage}
+            className="send-btn"
+            disabled={(!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading}
+          >
+            {isUploading ? <div className="spinner"></div> : <FiSend size={20} />}
+          </button>
+        </div>
       </div>
+
+      {/* IPFS Information Modal */}
+      <IpfsInfo isOpen={showIpfsInfo} onClose={() => setShowIpfsInfo(false)} />
     </div>
   );
 };

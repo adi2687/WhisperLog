@@ -355,9 +355,7 @@ const UserProfileSection = () => {
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          console.log(data)
+          localStorage.clear()
           navigate('/auth')
         }
         else{
@@ -412,9 +410,7 @@ const UserProfileSection = () => {
                 }}
               />
             ) : null}
-            <div className="default-avatar">
-              {profile.username?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
+           
             <div className="change-photo-text">
               <i className="fas fa-camera"></i> Change Photo
             </div>
@@ -523,7 +519,7 @@ const UserProfileSection = () => {
               {friends.map((friend) => (
                 <div key={friend._id} className="friend-item">
                   <div className="friend-item-content" onClick={() => navigate(`/profile/${friend._id}`)}>
-                    <img src={friend.profilePicture} alt={friend.username} />
+                    <img src={friend.profilePicture || 'default-avatar.svg'} alt={friend.username} />
                     <span>{friend.username}</span>
                   </div>
                   <button

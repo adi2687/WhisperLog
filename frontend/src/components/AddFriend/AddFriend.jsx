@@ -32,18 +32,18 @@ const AddFriend = () => {
   const [activeTab, setActiveTab] = useState('suggestions');
   const apiUrl = import.meta.env.VITE_BACKEND_URL;
   const searchInputRef = useRef(null);
-  
+
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
-  
+
   const handleAddFriend = async (userId, username) => {
     if (sentRequests.has(userId)) return;
-    
+
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      
+
       await axios.post(
-        `${apiUrl}/friends/request`, 
+        `${apiUrl}/friends/request`,
         { userId, username },
         {
           headers: {
@@ -53,13 +53,13 @@ const AddFriend = () => {
           withCredentials: true
         }
       );
-      
+
       setSentRequests(prev => new Set([...prev, userId]));
-      
-      setSearchResults(prev => 
-        prev.map(user => 
-          user._id === userId 
-            ? { ...user, requestSent: true } 
+
+      setSearchResults(prev =>
+        prev.map(user =>
+          user._id === userId
+            ? { ...user, requestSent: true }
             : user
         )
       );
@@ -75,11 +75,11 @@ const AddFriend = () => {
       setSearchResults([]);
       return;
     }
-    
+
     try {
       setIsSearching(true);
       const response = await axios.post(
-        `${apiUrl}/search/newfriends`, 
+        `${apiUrl}/search/newfriends`,
         { username: searchTerm },
         {
           headers: {
@@ -112,24 +112,26 @@ const AddFriend = () => {
     }
   };
 
-  const fetchall=()=>{console.log("fetchall")
-    fetch(`${apiUrl}/search/newfriends/allusers`,{
+  const fetchall = () => {
+    console.log("fetchall")
+    fetch(`${apiUrl}/search/newfriends/allusers`, {
 
-    method:"GET",
-    headers:{
-      "Authorization":`Bearer ${localStorage.getItem("token")}`,
-      "Content-Type":"application/json"
-    }
-  }).then(res=>res.json())
-  .then(data=>{
-    if (data.success){
-      setSearchResults(data.users)
-    }
-    else{
-      setSearchResults("couldnt fetch users")
-      
-    }    
-  })}
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json"
+      }
+    }).then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setSearchResults(data.users)
+        }
+        else {
+          setSearchResults("couldnt fetch users")
+
+        }
+      })
+  }
   return (
     <div className="add-friend-container">
       <div className="add-friend-header">
@@ -139,17 +141,21 @@ const AddFriend = () => {
 
       <div className="search-container">
         <div className="search-input-container">
-          <Search className="search-icon" size={20} />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by username"
-            className="search-input"
-          />
+          <div>
+            <div>
+              <Search className="search-icon" size={20} />
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by username"
+              className="search-input"
+            />
+          </div>
           {searchTerm && (
-            <button 
+            <button
               onClick={handleClearSearch}
               className="clear-search-button"
               aria-label="Clear search"
@@ -161,15 +167,15 @@ const AddFriend = () => {
       </div>
 
       <div className="tabs">
-        <button 
+        <button
           className={`tab ${activeTab === 'suggestions' ? 'active' : ''}`}
           onClick={() => setActiveTab('suggestions')}
         >
           Suggestions
         </button>
-        <button 
+        <button
           className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => {setActiveTab('all');fetchall()}}
+          onClick={() => { setActiveTab('all'); fetchall() }}
         >
           All Users
         </button>
@@ -184,7 +190,7 @@ const AddFriend = () => {
           <AnimatePresence>
             <motion.ul className="user-list">
               {searchResults.map((user) => (
-                <motion.li 
+                <motion.li
                   key={user._id}
                   className="user-card"
                   initial={{ opacity: 0, y: 10 }}
@@ -195,9 +201,9 @@ const AddFriend = () => {
                   <div className="user-info">
                     <div className="avatar">
                       {user.profilePicture ? (
-                        <img 
-                          src={user.profilePicture} 
-                          alt={user.username} 
+                        <img
+                          src={user.profilePicture}
+                          alt={user.username}
                           className="avatar-image"
                         />
                       ) : (
@@ -206,15 +212,16 @@ const AddFriend = () => {
                         </div>
                       )}
                     </div>
+                    {/* {JSON.stringify(user)} */}
                     <div className="user-details">
                       <h3 className="username">{user.username}</h3>
-                      <p className="user-email">{user.email || 'No email provided'}</p>
+                      {/* <p className="user-email">{user.email || 'No email provided'}</p> */}
                     </div>
                   </div>
-                  
+
                   <div className="user-actions">
-                    <Link 
-                      to={`/profile/${user._id}`} 
+                    <Link
+                      to={`/profile/${user._id}`}
                       className="view-profile-button"
                     >
                       <span>View Profile</span>

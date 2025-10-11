@@ -8,6 +8,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,6 +181,28 @@ router.put("/picture", verifyToken, upload.single('profilePicture'), async (req,
   }
 });
 
+const ALGORITHM = 'aes-256-cbc';
+const IV_LENGTH = 16;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'your-32-byte-encryption-key-123456';
+
+// Generate encryption key
+const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+
+const decrypt = (text) => {
+  if (!text) return text;
+  try {
+    const [ivHex, encrypted] = text.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return text; // Return original if decryption fails
+  }
+};
+
 router.get("/friends", verifyToken, async (req, res) => {
   try {
     const user = req.user;
@@ -214,7 +237,7 @@ router.get("/friends", verifyToken, async (req, res) => {
           lastSeen: onlineStatus?.lastSeen
         },
         lastMessage: latestmsg ? {
-          text: latestmsg.message,
+          text: decrypt(latestmsg.message),
           timestamp: latestmsg.timestamp,
           senderId: latestmsg.senderId,
           sender: senderDetails,
@@ -224,7 +247,7 @@ router.get("/friends", verifyToken, async (req, res) => {
       };
     }));
 
-    console.log('Friends with messages:', friendsWithMessages);
+    // console.log('Friends with messages:', friendsWithMessages);
     
     // Sort friends by latest message timestamp
     const sortedFriends = friendsWithMessages.sort((a, b) => {

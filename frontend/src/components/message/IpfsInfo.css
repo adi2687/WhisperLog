@@ -1,0 +1,409 @@
+/* ========================================
+   IPFS INFO MODAL
+   ======================================== */
+
+.ipfs-info-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ipfs-info-modal {
+  background: var(--bg-primary);
+  border-radius: 16px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-primary);
+  position: relative;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.ipfs-info-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-tertiary);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 28px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.ipfs-info-close:hover {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+  transform: rotate(90deg);
+}
+
+.ipfs-info-header {
+  padding: 32px 32px 24px;
+  border-bottom: 1px solid var(--border-primary);
+  text-align: center;
+}
+
+.ipfs-info-icon {
+  color: var(--accent-primary);
+  margin-bottom: 16px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.ipfs-info-header h2 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.ipfs-info-content {
+  padding: 24px 32px;
+}
+
+.ipfs-info-section {
+  margin-bottom: 28px;
+}
+
+.ipfs-info-section:last-child {
+  margin-bottom: 0;
+}
+
+.ipfs-info-section h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ipfs-info-section p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.ipfs-benefits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ipfs-benefits-list li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.benefit-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.ipfs-benefits-list strong {
+  display: block;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.ipfs-benefits-list p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+.ipfs-warning {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid #ffc107;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.ipfs-warning h3 {
+  color: #ffc107;
+}
+
+.ipfs-warning-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.ipfs-warning-list li {
+  padding: 8px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ipfs-warning-list strong {
+  color: var(--text-primary);
+}
+
+.ipfs-steps-list {
+  padding-left: 20px;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.ipfs-steps-list li {
+  padding: 6px 0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.ipfs-steps-list strong {
+  color: var(--text-primary);
+}
+
+.ipfs-recommendation {
+  background: var(--bg-secondary);
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.recommendation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.recommendation-card {
+  background: var(--bg-tertiary);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+}
+
+.recommendation-card h4 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.recommendation-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recommendation-card li {
+  padding: 6px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.recommendation-card li::before {
+  content: '•';
+  position: absolute;
+  left: 8px;
+  color: var(--accent-primary);
+}
+
+.ipfs-info-footer {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-primary);
+  text-align: center;
+}
+
+.ipfs-info-footer p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.ipfs-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.ipfs-link:hover {
+  color: var(--accent-secondary);
+  text-decoration: underline;
+}
+
+.ipfs-info-actions {
+  padding: 20px 32px 32px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.ipfs-info-btn {
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.ipfs-info-btn.primary {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.ipfs-info-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+  .ipfs-info-modal {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+
+  .ipfs-info-header {
+    padding: 24px 20px 20px;
+  }
+
+  .ipfs-info-header h2 {
+    font-size: 24px;
+  }
+
+  .ipfs-info-content {
+    padding: 20px;
+  }
+
+  .ipfs-info-section h3 {
+    font-size: 18px;
+  }
+
+  .recommendation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ipfs-info-actions {
+    padding: 16px 20px 24px;
+  }
+
+  .ipfs-info-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .ipfs-info-overlay {
+    padding: 10px;
+  }
+
+  .ipfs-info-header {
+    padding: 20px 16px 16px;
+  }
+
+  .ipfs-info-header h2 {
+    font-size: 20px;
+  }
+
+  .ipfs-info-content {
+    padding: 16px;
+  }
+
+  .ipfs-info-section {
+    margin-bottom: 20px;
+  }
+
+  .ipfs-info-section h3 {
+    font-size: 16px;
+  }
+
+  .ipfs-info-section p,
+  .ipfs-steps-list li,
+  .ipfs-warning-list li {
+    font-size: 13px;
+  }
+
+  .recommendation-card {
+    padding: 12px;
+  }
+
+  .ipfs-info-actions {
+    padding: 12px 16px 20px;
+  }
+}
+
+/* ========================================
+   SCROLLBAR
+   ======================================== */
+
+.ipfs-info-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ipfs-info-modal::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.ipfs-info-modal::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+.ipfs-info-modal::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
