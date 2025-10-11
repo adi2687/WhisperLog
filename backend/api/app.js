@@ -31,7 +31,7 @@ const app = express();
 const server = http.createServer(app);
 
 // CORS configuration
-const allowedOrigins = [frontend, 'https://whisperlog.vercel.app'];
+const allowedOrigins = [frontend, "http://localhost:5173",'https://whisperlog.vercel.app'];
 
 // Enable CORS for all routes
 app.use((req, res, next) => {
