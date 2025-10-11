@@ -23,6 +23,8 @@ import notificationRoute from '../route/sendnotification.route.js';
 import spellCorrectRoute from '../route/messageImprovver.js';
 import messageRoute from '../route/message.route.js';
 import messageIpfsRoute from '../route/message.ipfs.js';
+import groupRoute, { setIO as setGroupIO } from '../route/group.route.js';
+import anonymousRoute, { setIO as setAnonymousIO, handleAnonymousSocket } from '../route/anonymous.route.js';
 const PORT = process.env.PORT || 5000;
 const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 const app = express();
@@ -72,6 +74,8 @@ app.use('/notification', notificationRoute);
 app.use('/messageImprover', spellCorrectRoute);
 app.use('/message',messageRoute)
 app.use('/message/ipfs',messageIpfsRoute)
+app.use('/group', groupRoute);
+app.use('/anonymous', anonymousRoute);
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', {
     message: err.message,
@@ -121,6 +125,13 @@ const io = new Server(server, {
   pingTimeout: 60000, // optional
   pingInterval: 25000
 });
+
+// Export io for use in routes
+export { io };
+
+// Set io in group routes
+setGroupIO(io);
+setAnonymousIO(io);
 
 const chatMessages = new Map();
 import messageModel from '../models/message.model.js';
@@ -218,6 +229,9 @@ process.on('SIGTERM', () => {
 // Handle video call connections
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+
+  // Handle anonymous chat
+  handleAnonymousSocket(socket);
 
   // Video call room management
   socket.on("server-join", (room) => {
@@ -317,7 +331,8 @@ io.on('connection', (socket) => {
 
   socket.on('message', async ({ 
     chatId, message, senderId, receiverId, imageUrl, 
-    fileUrl, fileName, fileType, fileSize, tempMessageId, _id 
+    fileUrl, fileName, fileType, fileSize, tempMessageId, _id,
+    isGroupMessage, groupId
   }) => {
     // Encrypt the message if it exists
     const encryptedMessage = message ? encrypt(message) : message;
@@ -344,7 +359,9 @@ io.on('connection', (socket) => {
         message: encryptedMessage || '',
         timestamp: Date.now(),
         senderId,
-        receiverId,
+        receiverId: isGroupMessage ? null : receiverId,
+        isGroupMessage: isGroupMessage || false,
+        groupId: groupId || null,
         isRead: false,
         imageUrl: imageUrl || null,
         fileUrl: fileUrl || null,
@@ -419,12 +436,56 @@ io.on('connection', (socket) => {
         });
       }
     }
-    socket.on('disconnect', () => {
-      console.log('User disconnected:', socket.id);
-    });
   });
-  
-  
+
+  // ========== MESSAGE REACTIONS ==========
+  socket.on('message_reaction', async ({ messageId, emoji, userId, username, chatId }) => {
+    try {
+      const message = await messageModel.findById(messageId);
+      if (!message) {
+        console.log('Message not found:', messageId);
+        return;
+      }
+
+      // Initialize reactions array if it doesn't exist
+      if (!message.reactions) {
+        message.reactions = [];
+      }
+
+      // Check if user already reacted with this emoji
+      const existingReactionIndex = message.reactions.findIndex(
+        r => r.userId === userId && r.emoji === emoji
+      );
+
+      if (existingReactionIndex !== -1) {
+        // Remove reaction
+        message.reactions.splice(existingReactionIndex, 1);
+        console.log(`Removed reaction ${emoji} from message ${messageId}`);
+      } else {
+        // Add reaction
+        message.reactions.push({ 
+          userId, 
+          emoji, 
+          timestamp: new Date() 
+        });
+        console.log(`Added reaction ${emoji} to message ${messageId}`);
+      }
+
+      await message.save();
+
+      // Broadcast to all users in the chat
+      io.to(chatId).emit('reaction_update', {
+        messageId,
+        reactions: message.reactions
+      });
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
 });
 
 

@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 
-export const verifyToken = async (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   try {
     // console.log('Auth Headers:', req.headers);
     // Get token from cookies or Authorization header
@@ -57,6 +57,10 @@ export const verifyToken = async (req, res, next) => {
     });
   }
 };
+
+export default verifyToken;
+export { verifyToken };
+export const authMiddleware = verifyToken;
 
 // export const checkRole = (roles = []) => {
 //   return (req, res, next) => {

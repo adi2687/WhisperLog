@@ -8,7 +8,19 @@ const messageSchema = new mongoose.Schema(
     },
     receiverId: {
       type: String,
-      required: true
+      required: function() {
+        // receiverId is not required for group messages
+        return !this.isGroupMessage;
+      }
+    },
+    isGroupMessage: {
+      type: Boolean,
+      default: false
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      default: null
     },
     message: {
       type: String,
@@ -58,6 +70,17 @@ const messageSchema = new mongoose.Schema(
     tempMessageId: {
       type: String,
       default: null
+    },
+    // Reactions for messages
+    reactions: [{
+      userId: { type: String, required: true },
+      emoji: { type: String, required: true },
+      timestamp: { type: Date, default: Date.now }
+    }],
+    // System message flag (for join/leave notifications)
+    isSystemMessage: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

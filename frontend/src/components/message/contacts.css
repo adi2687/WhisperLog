@@ -36,6 +36,52 @@
 }
 
 /* ========================================
+   TABS
+   ======================================== */
+
+.contacts-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #ffffff 0%, #e6e6e6 100%);
+  border-color: #ffffff;
+  color: #000000;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
+.tab-button svg {
+  font-size: 16px;
+}
+
+/* ========================================
    ACTION BUTTONS
    ======================================== */
 
@@ -268,6 +314,46 @@
 
 .online-status.online .status-icon {
   animation: pulse-online 2s infinite;
+}
+
+/* Group members count */
+.group-members-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+/* Create group button in empty state */
+.create-group-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  margin-top: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #e6e6e6 100%);
+  color: #000000;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
+.create-group-btn:hover {
+  background: linear-gradient(135deg, #e6e6e6 0%, #cccccc 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.4);
+}
+
+.create-group-btn:active {
+  transform: translateY(0);
 }
 
 @keyframes pulse-online {

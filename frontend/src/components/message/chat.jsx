@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { io } from 'socket.io-client';
-import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiCamera, FiInfo, FiArrowLeft } from 'react-icons/fi';
+import { FiSend, FiPaperclip, FiImage, FiX, FiFile, FiGift, FiVideo, FiMic, FiPhone, FiCamera, FiInfo, FiArrowLeft, FiUsers } from 'react-icons/fi';
 import { FaMagic, FaSpinner } from 'react-icons/fa';
+import toast, { Toaster } from 'react-hot-toast';
 
 import { format } from 'date-fns';
 import './chat.css';
@@ -14,6 +15,9 @@ import axios from 'axios';
 import Aurora from '../../pages/Aurora';
 import IpfsInfo from './IpfsInfo';
 import { useNavigate } from 'react-router-dom';
+import GroupInfo from '../Groups/GroupInfo';
+import MessageReactions from './MessageReactions';
+import GroupTypingIndicator from './GroupTypingIndicator';
 const socket = io(import.meta.env.VITE_BACKEND_URL);
 
 export default function Message({ receiverDetails, onBack }) {
@@ -46,6 +50,10 @@ export default function Message({ receiverDetails, onBack }) {
   const [lastSeen, setLastSeen] = useState(null);
   const [method, setmethod] = useState("normal");
   const [showIpfsInfo, setShowIpfsInfo] = useState(false);
+  const [isGroup, setIsGroup] = useState(false);
+  const [groupDetails, setGroupDetails] = useState(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupTypingUsers, setGroupTypingUsers] = useState([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -61,7 +69,18 @@ export default function Message({ receiverDetails, onBack }) {
   useEffect(() => {
     if (receiver) setCurrentReceiver(receiver);
     if (receiverDetails) setCurrentReceiverDetails(receiverDetails);
-  }, [receiver, receiverDetails]);
+    
+    // Handle group state from navigation
+    const state = location.state;
+    if (state?.isGroup && state?.groupDetails) {
+      setIsGroup(true);
+      setGroupDetails(state.groupDetails);
+      setCurrentReceiver(state.groupDetails.chatId);
+    } else {
+      setIsGroup(false);
+      setGroupDetails(null);
+    }
+  }, [receiver, receiverDetails, location.state]);
 
   // Fetch user status when receiver changes
   useEffect(() => {
@@ -450,42 +469,82 @@ export default function Message({ receiverDetails, onBack }) {
     e.preventDefault();
     if ((!message.trim() && !selectedImage && !selectedVideo && !selectedFile && !selectedGif) || isUploading) return;
 
-    try {
-      setIsUploading(true);
+    // Create a temporary message ID for optimistic update
+    const tempMessageId = `temp-${Date.now()}`;
+    
+    // Store references to selected files before clearing
+    const imageToUpload = selectedImage;
+    const videoToUpload = selectedVideo;
+    const fileToUpload = selectedFile;
+    const gifUrl = selectedGif;
+    const messageText = message.trim();
 
-      // Create a temporary message ID for optimistic update
-      const tempMessageId = `temp-${Date.now()}`;
-      const tempMessage = {
-        _id: tempMessageId,
-        message: message.trim(),
-        senderId: user._id,
-        receiverId: receiver,
-        chatId: chatId,
-        imageUrl: selectedGif || null,
-        fileUrl: null,
-        fileName: null,
-        fileType: null,
-        fileSize: null,
-        status: 'sending',
-        createdAt: new Date().toISOString()
+    // Create preview URLs for immediate display
+    let previewImageUrl = gifUrl;
+    let previewFileData = null;
+
+    if (imageToUpload) {
+      previewImageUrl = URL.createObjectURL(imageToUpload);
+    } else if (videoToUpload) {
+      previewFileData = {
+        fileUrl: URL.createObjectURL(videoToUpload),
+        fileName: videoToUpload.name,
+        fileType: videoToUpload.type,
+        fileSize: videoToUpload.size,
+        isPreview: true
       };
+    } else if (fileToUpload) {
+      previewFileData = {
+        fileUrl: null,
+        fileName: fileToUpload.name,
+        fileType: fileToUpload.type,
+        fileSize: fileToUpload.size,
+        isPreview: true
+      };
+    }
 
-      // Add the message to local state immediately
-      setChat(prev => [...prev, tempMessage]);
-      scrollToBottom(); // Scroll to show the new message
+    // Create temporary message with preview
+    const tempMessage = {
+      _id: tempMessageId,
+      message: messageText,
+      senderId: user._id,
+      receiverId: receiver,
+      chatId: chatId,
+      imageUrl: previewImageUrl,
+      ...(previewFileData && previewFileData),
+      status: 'uploading',
+      createdAt: new Date().toISOString()
+    };
 
-      let imageUrl = selectedGif || null;
+    // Add the message to chat immediately
+    setChat(prev => [...prev, tempMessage]);
+    scrollToBottom();
+
+    // Clear input fields immediately for better UX
+    setMessage('');
+    setSelectedImage(null);
+    setSelectedFile(null);
+    setSelectedGif(null);
+    setSelectedVideo(null);
+    setIsUploading(true);
+
+    try {
+      let imageUrl = gifUrl || null;
       let fileData = null;
 
-      // Handle media uploads
-      if (selectedImage) {
-        const result = await handleFileUpload(selectedImage, 'image');
+      // Handle media uploads in background
+      if (imageToUpload) {
+        const result = await handleFileUpload(imageToUpload, 'image');
         imageUrl = result.imageUrl || result.url;
+        // Revoke preview URL
+        if (previewImageUrl && previewImageUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewImageUrl);
+        }
       }
       // Handle video upload if exists
-      else if (selectedVideo) {
+      else if (videoToUpload) {
         try {
-          const result = await handleFileUpload(selectedVideo, 'video');
+          const result = await handleFileUpload(videoToUpload, 'video');
           const videoUrl = result.secure_url || result.url;
           const thumbnailUrl = result.thumbnail ||
             (result.eager && result.eager[0]?.url) ||
@@ -493,7 +552,7 @@ export default function Message({ receiverDetails, onBack }) {
 
           fileData = {
             fileUrl: videoUrl,
-            fileName: result.originalname || selectedVideo.name,
+            fileName: result.originalname || videoToUpload.name,
             fileType: result.resource_type === 'video' ? 'video' : (result.format ? `video/${result.format}` : 'video/mp4'),
             thumbnail: thumbnailUrl,
             duration: result.duration,
@@ -504,14 +563,18 @@ export default function Message({ receiverDetails, onBack }) {
             resource_type: result.resource_type,
             eager: result.eager
           };
+          // Revoke preview URL
+          if (previewFileData?.fileUrl?.startsWith('blob:')) {
+            URL.revokeObjectURL(previewFileData.fileUrl);
+          }
         } catch (error) {
           console.error('Error processing video upload:', error);
           throw new Error(`Failed to process video: ${error.message}`);
         }
       }
       // Handle file upload if exists
-      else if (selectedFile) {
-        const result = await handleFileUpload(selectedFile, 'file');
+      else if (fileToUpload) {
+        const result = await handleFileUpload(fileToUpload, 'file');
         console.log('File upload result:', result);
 
         // Extract URL from various possible response formats
@@ -524,9 +587,9 @@ export default function Message({ receiverDetails, onBack }) {
 
         fileData = {
           fileUrl: fileUrl,
-          fileName: selectedFile.name,
-          fileType: selectedFile.type,
-          fileSize: selectedFile.size
+          fileName: fileToUpload.name,
+          fileType: fileToUpload.type,
+          fileSize: fileToUpload.size
         };
 
         console.log('File data prepared:', fileData);
@@ -537,7 +600,8 @@ export default function Message({ receiverDetails, onBack }) {
         ...tempMessage,
         imageUrl: imageUrl,
         ...(fileData && fileData),
-        status: 'sent' // Update status
+        status: 'sent',
+        isPreview: undefined // Remove preview flag
       };
 
       // Update the local state with the final message (including file data)
@@ -560,18 +624,13 @@ export default function Message({ receiverDetails, onBack }) {
       // Emit the message via socket
       socket.emit('message', {
         ...finalMessage,
+        isGroupMessage: isGroup,
+        groupId: groupDetails?._id,
         tempMessageId: tempMessageId // Include temp ID for reference
       });
 
-      // Clear the input fields
-      setMessage('');
-      setSelectedImage(null);
-      setSelectedFile(null);
-      setSelectedGif(null);
-      setSelectedVideo(null);
-
       // Update the message status when server acknowledges
-      const ackTimeout = setTimeout(() => {
+      setTimeout(() => {
         setChat(prev =>
           prev.map(msg =>
             msg._id === tempMessageId && msg.status === 'sent'
@@ -580,18 +639,22 @@ export default function Message({ receiverDetails, onBack }) {
           )
         );
       }, 1000);
-      // Cleanup on component unmount
-      return () => clearTimeout(ackTimeout);
+
     } catch (error) {
       console.error('Error sending message:', error);
-      setIsUploading(false);
 
-      // Remove the failed message from chat
-      setChat(prev => prev.filter(msg => msg._id !== tempMessageId));
+      // Update message to show failed status
+      setChat(prev =>
+        prev.map(msg =>
+          msg._id === tempMessageId
+            ? { ...msg, status: 'failed', error: error.message }
+            : msg
+        )
+      );
 
       // Show user-friendly error message
       const errorMsg = error.message || 'Failed to send message';
-      alert(`❌ ${errorMsg}\n\nPlease try again.`);
+      alert(`❌ ${errorMsg}\n\nThe message will remain in chat marked as failed.`);
     } finally {
       setIsUploading(false);
     }
@@ -705,12 +768,48 @@ export default function Message({ receiverDetails, onBack }) {
     socket.on('loadMessages', handleLoadMessages);
     socket.on('message', handleNewMessage);
 
+    // Listen for reaction updates from server (for other users' reactions)
+    socket.on('reaction_update', ({ messageId, reactions }) => {
+      console.log('Reaction update received from server:', messageId, reactions);
+      setChat(prev => {
+        const message = prev.find(m => m._id === messageId);
+        if (!message) return prev;
+        
+        // Only update if reactions actually changed
+        const currentReactionsStr = JSON.stringify(message.reactions || []);
+        const newReactionsStr = JSON.stringify(reactions);
+        
+        if (currentReactionsStr === newReactionsStr) {
+          return prev; // No change, don't update
+        }
+        
+        const updated = prev.map(msg => 
+          msg._id === messageId ? { ...msg, reactions: [...reactions] } : msg
+        );
+        return [...updated];
+      });
+    });
+
+    // Listen for group updates (member changes, admin promotions)
+    socket.on('group_updated', ({ groupId, group }) => {
+      console.log('Group updated:', groupId, group);
+      if (isGroup && groupDetails?._id === groupId) {
+        setGroupDetails(group);
+        toast.success('Group updated', {
+          duration: 2000,
+          position: 'top-center',
+        });
+      }
+    });
+
     // Clean up socket listeners
     return () => {
       socket.off('loadMessages', handleLoadMessages);
       socket.off('message', handleNewMessage);
+      socket.off('reaction_update');
+      socket.off('group_updated');
     };
-  }, [chatId, handleNewMessage]);
+  }, [chatId, handleNewMessage, isGroup, groupDetails]);
 
   // Detect screenshot attempts
   useEffect(() => {
@@ -772,7 +871,7 @@ export default function Message({ receiverDetails, onBack }) {
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
-  }, [chat]);
+  }, [chat,chatId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -897,7 +996,7 @@ export default function Message({ receiverDetails, onBack }) {
     if (msg.isSystemMessage) {
       return (
         <div className="system-message">
-          <FiCamera className="system-icon" />
+          <FiUsers className="system-icon" />
           <span>{msg.message}</span>
         </div>
       );
@@ -1050,6 +1149,14 @@ export default function Message({ receiverDetails, onBack }) {
         <div className="message-footer">
           <span className="message-time">
             {format(new Date(msg.createdAt || Date.now()), 'h:mm a')}
+            {msg.senderId === user?._id && (
+              <span className={`message-status-icon ${msg.status || 'sent'}`} title={msg.status === 'failed' ? msg.error : msg.status}>
+                {msg.status === 'uploading' && '⏳'}
+                {msg.status === 'sent' && '✓'}
+                {msg.status === 'delivered' && '✓✓'}
+                {msg.status === 'failed' && '✗'}
+              </span>
+            )}
           </span>
           {msg.senderId === receiver && (
             <div className="message-actions">
@@ -1208,6 +1315,7 @@ export default function Message({ receiverDetails, onBack }) {
     }
   };
 
+  // is the group done???
   // Handle message input change
   const handleMessageChange = (e) => {
     const newMessage = e.target.value;
@@ -1271,6 +1379,29 @@ export default function Message({ receiverDetails, onBack }) {
 
   return (
     <div className="chat-container" style={{ position: 'relative', overflow: 'hidden', height: '100%', width: '100%' }}>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#4ade80',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <div className="chat-content">
         <div className="chat-header">
           <button onClick={() => navigate('/chat')} className="back-buttonchat">
@@ -1282,14 +1413,43 @@ export default function Message({ receiverDetails, onBack }) {
             </div>
           </button>
           <div className="chat-header-info">
-
-            <div>
-              <img src={currentReceiverDetails?.profilePicture || '/default-avatar.svg'} alt="Profile" 
-              onClick={()=>navigate(`/profile/${currentReceiverDetails?._id}`)}/>
-              <h3>{currentReceiverDetails?.username || 'Chat'}</h3>
-              
-            </div>
-            
+            {isGroup ? (
+              // GROUP HEADER
+              <>
+                <div className="header-user-info">
+                  <img 
+                    src={groupDetails?.groupIcon || '/default-group-icon.svg'} 
+                    alt={groupDetails?.name}
+                    style={{ cursor: 'pointer', width: '45px', height: '45px', borderRadius: '50%', objectFit: 'cover' }}
+                    onClick={() => setShowGroupInfo(true)}
+                  />
+                  <div className="header-text-info">
+                    <h3>{groupDetails?.name || 'Group Chat'}</h3>
+                    <span className="group-members-info">
+                      <FiUsers size={12} /> {groupDetails?.members?.length || 0} members
+                    </span>
+                  </div>
+                  <button 
+                  className="group-info-btn"
+                  onClick={() => setShowGroupInfo(true)}
+                  title="Group Info"
+                >
+                  <FiInfo size={20} />
+                </button>
+                </div>
+                
+              </>
+            ) : (
+              // 1-ON-1 CHAT HEADER
+              <div className="header-user-info">
+                <img 
+                  src={currentReceiverDetails?.profilePicture || '/default-avatar.svg'} 
+                  alt="Profile" 
+                  onClick={()=>navigate(`/profile/${currentReceiverDetails?._id}`)}
+                />
+                <h3>{currentReceiverDetails?.username || 'Chat'}</h3>
+              </div>
+            )}
           </div>
         </div>
         {/* Image Preview Modal */}
@@ -1319,20 +1479,73 @@ export default function Message({ receiverDetails, onBack }) {
 
         <div className="chat-box">
           {chat.length > 0 ? (
-            chat.map((msg, index) => (
-              <div
-                key={`${msg._id || 'temp'}-${msg.timestamp || Date.now()}-${index}`}
-
-                className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'}`}
-              >
-                <div className='message-main'>
-                  <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
-                    {renderMessageContent(msg)}
-
-                  </div>
+            chat.map((msg, index) => {
+              // Skip rendering if message has no content
+              if (!msg.message && !msg.imageUrl && !msg.fileUrl && !msg.isSystemMessage) {
+                return null;
+              }
+              
+              return (
+                <div
+                  key={`${msg._id || 'temp'}-${msg.timestamp || Date.now()}-${index}`}
+                  className={`message-bubble ${msg.senderId === user?._id ? 'sent' : 'received'} ${msg.status || ''}`}
+                >
+                  <div className='message-main'>
+                    <div className={`message-content ${msg.imageUrl ? 'has-image' : ''}`}>
+                      {renderMessageContent(msg)}
+                    </div>
+                  {/* Add Reactions Component - Don't show on system messages */}
+                  {user && !msg.isSystemMessage && (
+                    <MessageReactions
+                      key={`reactions-${msg._id}-${JSON.stringify(msg.reactions)}`}
+                      message={msg}
+                      onReact={(messageId, emoji) => {
+                        console.log('REACTION CLICKED!', messageId, emoji);
+                        
+                        // Optimistic update - update UI immediately
+                        setChat(prev => prev.map(m => {
+                          if (m._id === messageId) {
+                            const currentReactions = m.reactions || [];
+                            const existingIndex = currentReactions.findIndex(
+                              r => r.userId === user._id && r.emoji === emoji
+                            );
+                            
+                            let newReactions;
+                            if (existingIndex !== -1) {
+                              // Remove reaction
+                              newReactions = currentReactions.filter((_, i) => i !== existingIndex);
+                            } else {
+                              // Add reaction
+                              newReactions = [...currentReactions, { userId: user._id, emoji, timestamp: new Date() }];
+                            }
+                            
+                            return { ...m, reactions: newReactions };
+                          }
+                          return m;
+                        }));
+                        
+                        // Send to server
+                        socket.emit('message_reaction', {
+                          messageId,
+                          emoji,
+                          userId: user._id,
+                          username: user.username,
+                          chatId: currentReceiver
+                        });
+                      }}
+                      currentUserId={user._id}
+                    />
+                  )}
+                  {/* Message Timestamp */}
+                  {!msg.isSystemMessage && (
+                    <div className="message-timestamp">
+                      {format(new Date(msg.createdAt || msg.timestamp || Date.now()), 'h:mm a')}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))
+            );
+            })
           ) : (
             <div className="no-messages">
               <p>Start a conversation with {receiverDetails?.name || 'this user'}</p>
@@ -1616,6 +1829,17 @@ export default function Message({ receiverDetails, onBack }) {
 
       {/* IPFS Information Modal */}
       <IpfsInfo isOpen={showIpfsInfo} onClose={() => setShowIpfsInfo(false)} />
+      
+      {/* Group Info Modal */}
+      {isGroup && (
+        <GroupInfo
+          group={groupDetails}
+          isOpen={showGroupInfo}
+          onClose={() => setShowGroupInfo(false)}
+          onUpdate={(updatedGroup) => setGroupDetails(updatedGroup)}
+          currentUserId={user?._id}
+        />
+      )}
     </div>
   );
 };

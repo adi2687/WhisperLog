@@ -8,18 +8,19 @@ import { useLocation } from 'react-router-dom';
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-
-  // Hide navbar on /chat route
-  if (location.pathname.includes("/chat")) {
-    return null; // completely skip rendering
-  }
   const checking = localStorage.getItem("token")
   const [login, setlogin] = useState(false)
+  
   useEffect(() => {
     if (checking) {
       setlogin(true)
     }
   }, [])
+
+  // Hide navbar on /chat route
+  if (location.pathname.includes("/chat")) {
+    return null; // completely skip rendering
+  }
   return (
     <div className="navbar">
       <PillNav
@@ -33,7 +34,7 @@ const Navbar = () => {
           { href: "/anonymouschat", label: "Anonymous Chat" },
           { href:  login ? "/Profile": "/Login/SignUp" , label: `${login ? "Profile" : "Login/SignUp"}` }
         ]}
-        activeHref="/"
+        activeHref="/"  
         ease="power3.easeOut"
         baseColor="#fff"
         pillColor="#060010"

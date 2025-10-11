@@ -23,6 +23,7 @@ import Aurora from './pages/main';
 import Video from './components/message/video/video'; 
 import Join from './components/message/video/JoinRoom';
 import NotificationBell from './components/Notifications/NotificationBell';
+import Groups from './components/Groups/GroupList';
 // imp
 // Protected route component
 
@@ -56,6 +57,7 @@ function App() {
                     <Route path='/video' element={<Video />} />
                     <Route path='/join' element={<Join />} />
                     <Route path='/notification' element={<NotificationBell />} />
+                    <Route path='/groups' element={<Groups />} />
                   </Routes>
                   </main>
                   <Footer />

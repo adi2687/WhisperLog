@@ -1,8 +1,9 @@
 import { useProfileCurrentUser } from '../../contexts/ProfileContext';
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaSearch, FaUserFriends, FaUser, FaCircle } from 'react-icons/fa';
+import { FaSearch, FaUserFriends, FaUser, FaCircle, FaUsers, FaPlus } from 'react-icons/fa';
 import { io } from 'socket.io-client';
+import axios from 'axios';
 import './contacts.css';
 
 export default function Contacts() {
@@ -11,6 +12,8 @@ export default function Contacts() {
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
     const navigate = useNavigate();
     const [friends, setFriends] = useState([]);
+    const [groups, setGroups] = useState([]);
+    const [activeTab, setActiveTab] = useState('chats'); // 'chats' or 'groups'
     const [searchQuery, setSearchQuery] = useState('');
     const [onlineUsers, setOnlineUsers] = useState({});
     const socketRef = useRef(null);
@@ -33,8 +36,24 @@ export default function Contacts() {
             .catch(error => console.error('Error fetching friends:', error));
     };
 
+    const getGroups = async () => {
+        try {
+            const response = await axios.get(`${backendUrl}/group/my-groups`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (response.data.success) {
+                setGroups(response.data.groups);
+            }
+        } catch (error) {
+            console.error('Error fetching groups:', error);
+        }
+    };
+
     useEffect(() => {
         getFriends();
+        getGroups();
 
         // Initialize socket connection
         const token = localStorage.getItem('token');
@@ -80,6 +99,20 @@ export default function Contacts() {
     const filteredFriends = friends.filter(friend =>
         friend.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const filteredGroups = groups.filter(group =>
+        group.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const handleGroupClick = (group) => {
+        navigate(`/chat/${group.chatId}`, {
+            state: {
+                isGroup: true,
+                groupDetails: group
+            }
+        });
+    };
+
     const findchatid = (receiverId, receiver) => {
         fetch(`${backendUrl}/message/findid`, {
             method: 'POST',
@@ -124,14 +157,40 @@ export default function Contacts() {
             <div className="contacts-header">
                 <h2 className="contacts-title">
                     <FaUserFriends />
-                    Contacts
+                    Messages
                 </h2>
             </div>
-            <div className='action-buttons'>
-                <button className="add-contact-button" onClick={() => navigate('/addfriend')}>
+
+            {/* Tabs */}
+            <div className="contacts-tabs">
+                <button 
+                    className={`tab-button ${activeTab === 'chats' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('chats')}
+                >
                     <FaUserFriends />
-                    Add Contact
+                    Chats
                 </button>
+                <button 
+                    className={`tab-button ${activeTab === 'groups' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('groups')}
+                >
+                    <FaUsers />
+                    Groups
+                </button>
+            </div>
+
+            <div className='action-buttons'>
+                {activeTab === 'chats' ? (
+                    <button className="add-contact-button" onClick={() => navigate('/addfriend')}>
+                        <FaUserFriends />
+                        Add Contact
+                    </button>
+                ) : (
+                    <button className="add-contact-button" onClick={() => navigate('/groups')}>
+                        <FaPlus />
+                        New Group
+                    </button>
+                )}
                 <button className="add-contact-button" onClick={() => navigate('/profile')}>
                     <FaUser />
                     Profile
@@ -143,7 +202,7 @@ export default function Contacts() {
                     <FaSearch className="search-icon" />
                     <input
                         type="text"
-                        placeholder="Search contacts..."
+                        placeholder={activeTab === 'chats' ? 'Search contacts...' : 'Search groups...'}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -151,55 +210,105 @@ export default function Contacts() {
             </div>
 
             <div className="contacts-list">
-                {filteredFriends.length > 0 ? (
-                    filteredFriends.map((friend) => (
-                        <div
-                            key={friend._id}
-                            className={`contact-item ${activeChatId === friend._id ? 'active' : ''}`}
-                            onClick={() => findchatid(friend._id, friend)}
-                        >
-                            <img
-                                src={friend.profilePicture || '/default-avatar.svg'}
-                                alt={friend.username}
-                                className="user-pic"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = '/default-avatar.svg';
-                                }}
-                            />
-                            <div className="contact-info">
-                                <div className="contact-header">
-                                    <h4>{friend.username}</h4>
-                                    {onlineUsers[friend._id]?.isOnline ? (
-                                        <span className="online-status online">
-                                            <FaCircle className="status-icon" /> Online
-                                        </span>
-                                    ) : (
-                                        <span className="online-status offline" title={formatLastSeen(onlineUsers[friend._id]?.lastSeen)}>
-                                            <FaCircle className="status-icon" /> Offline
+                {activeTab === 'chats' ? (
+                    // CHATS TAB
+                    filteredFriends.length > 0 ? (
+                        filteredFriends.map((friend) => (
+                            <div
+                                key={friend._id}
+                                className={`contact-item ${activeChatId === friend._id ? 'active' : ''}`}
+                                onClick={() => findchatid(friend._id, friend)}
+                            >
+                                <img
+                                    src={friend.profilePicture || '/default-avatar.svg'}
+                                    alt={friend.username}
+                                    className="user-pic"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = '/default-avatar.svg';
+                                    }}
+                                />
+                                <div className="contact-info">
+                                    <div className="contact-header">
+                                        <h4>{friend.username}</h4>
+                                        {onlineUsers[friend._id]?.isOnline ? (
+                                            <span className="online-status online">
+                                                <FaCircle className="status-icon" /> Online
+                                            </span>
+                                        ) : (
+                                            <span className="online-status offline" title={formatLastSeen(onlineUsers[friend._id]?.lastSeen)}>
+                                                <FaCircle className="status-icon" /> Offline
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="last-message">
+                                        {friend.lastMessage ?
+                                            `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}`
+                                            : 'Start a new conversation'}
+                                    </p>
+
+                                    {!onlineUsers[friend._id]?.isOnline && onlineUsers[friend._id]?.lastSeen && (
+                                        <span className="last-seen">
+                                            {`Last seen ${new Date(onlineUsers[friend._id].lastSeen).toLocaleString()}`}
                                         </span>
                                     )}
                                 </div>
-                                <p className="last-message">
-                                    {friend.lastMessage ?
-                                        `${friend.lastMessage.text} • ${new Date(friend.lastMessage.timestamp).toLocaleTimeString()}`
-                                        : 'Start a new conversation'}
-                                </p>
-
-                                {!onlineUsers[friend._id]?.isOnline && onlineUsers[friend._id]?.lastSeen && (
-                                    <span className="last-seen">
-                                        {`Last seen ${new Date(onlineUsers[friend._id].lastSeen).toLocaleString()}`}
-                                    </span>
-                                )}
                             </div>
+                        ))
+                    ) : (
+                        <div className="no-contacts">
+                            <FaUserFriends size={40} />
+                            <p>No contacts found</p>
+                            {searchQuery && <p>Try a different search term</p>}
                         </div>
-                    ))
+                    )
                 ) : (
-                    <div className="no-contacts">
-                        <FaUserFriends size={40} />
-                        <p>No contacts found</p>
-                        {searchQuery && <p>Try a different search term</p>}
-                    </div>
+                    // GROUPS TAB
+                    filteredGroups.length > 0 ? (
+                        filteredGroups.map((group) => (
+                            <div
+                                key={group._id}
+                                className={`contact-item ${activeChatId === group.chatId ? 'active' : ''}`}
+                                onClick={() => handleGroupClick(group)}
+                            >
+                                <img
+                                    src={group.groupIcon || '/default-group-icon.svg'}
+                                    alt={group.name}
+                                    className="user-pic"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = '/default-group-icon.svg';
+                                    }}
+                                />
+                                <div className="contact-info">
+                                    <div className="contact-header">
+                                        <h4>{group.name}</h4>
+                                        <span className="group-members-count">
+                                            <FaUsers size={12} /> {group.members?.length || 0}
+                                        </span>
+                                    </div>
+                                    <p className="last-message">
+                                        {group.lastMessage?.message || 'No messages yet'}
+                                    </p>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="no-contacts">
+                            <FaUsers size={40} />
+                            <p>No groups found</p>
+                            {searchQuery ? (
+                                <p>Try a different search term</p>
+                            ) : (
+                                <button 
+                                    className="create-group-btn"
+                                    onClick={() => navigate('/groups')}
+                                >
+                                    <FaPlus /> Create Your First Group
+                                </button>
+                            )}
+                        </div>
+                    )
                 )}
             </div>
         </div>
