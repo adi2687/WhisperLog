@@ -72,6 +72,17 @@ export const handleAnonymousSocket = (socket) => {
     });
   });
 
+  // Handle typing indicator
+  socket.on('anonymous_typing', ({ roomId, senderId, isTyping }) => {
+    const room = activeRooms.get(roomId);
+    if (!room) return;
+
+    // Broadcast typing status to partner
+    socket.to(roomId).emit('anonymous_typing', {
+      isTyping
+    });
+  });
+
   // Leave anonymous chat
   socket.on('leave_anonymous', ({ roomId, userId }) => {
     console.log('User leaving anonymous chat:', userId, roomId);

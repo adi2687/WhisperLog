@@ -25,6 +25,7 @@ import messageRoute from '../route/message.route.js';
 import messageIpfsRoute from '../route/message.ipfs.js';
 import groupRoute, { setIO as setGroupIO } from '../route/group.route.js';
 import anonymousRoute, { setIO as setAnonymousIO, handleAnonymousSocket } from '../route/anonymous.route.js';
+import googleLogin from '../route/google.login.js'
 const PORT = process.env.PORT || 5000;
 const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 const app = express();
@@ -63,6 +64,7 @@ app.get('/', (req, res) => {
 
 app.use('/auth/register', userRegister);
 app.use('/auth/login', userLogin);
+app.use('/google',googleLogin)
 app.use('/visitfriend', userRoutes);
 app.use('/api/profile', ProfileRoues);
 app.use('/api/users', userRoutes);
@@ -76,6 +78,7 @@ app.use('/message',messageRoute)
 app.use('/message/ipfs',messageIpfsRoute)
 app.use('/group', groupRoute);
 app.use('/anonymous', anonymousRoute);
+
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', {
     message: err.message,
@@ -489,6 +492,6 @@ io.on('connection', (socket) => {
 });
 
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

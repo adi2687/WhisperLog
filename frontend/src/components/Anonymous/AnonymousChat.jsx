@@ -15,7 +15,32 @@ export default function AnonymousChat() {
   const [anonymousId, setAnonymousId] = useState(null);
   const [partnerId, setPartnerId] = useState(null);
   const [roomId, setRoomId] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const [interests, setInterests] = useState([]);
+  const [showInterests, setShowInterests] = useState(false);
+  const [icebreaker, setIcebreaker] = useState('');
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  const availableInterests = [
+    '🎮 Gaming', '🎵 Music', '🎬 Movies', '📚 Books', '⚽ Sports',
+    '🎨 Art', '💻 Tech', '🍕 Food', '✈️ Travel', '📸 Photography',
+    '🎭 Theater', '🏋️ Fitness', '🧘 Yoga', '🎸 Guitar', '🎤 Singing'
+  ];
+
+  const icebreakers = [
+    "What's the best thing that happened to you this week?",
+    "If you could have dinner with anyone, who would it be?",
+    "What's your favorite way to spend a weekend?",
+    "What's the most interesting place you've ever visited?",
+    "If you could learn any skill instantly, what would it be?",
+    "What's your favorite movie or TV show?",
+    "What's something you're passionate about?",
+    "If you could travel anywhere right now, where would you go?",
+    "What's the best advice you've ever received?",
+    "What's your favorite hobby or pastime?"
+  ];
 
   useEffect(() => {
     // Generate anonymous ID
@@ -61,6 +86,10 @@ export default function AnonymousChat() {
       toast('Searching for a stranger...', { icon: '🔍' });
     });
 
+    socket.on('anonymous_typing', ({ isTyping }) => {
+      setPartnerTyping(isTyping);
+    });
+
     return () => {
       socket.off('anonymous_matched');
       socket.off('anonymous_message');
@@ -77,10 +106,22 @@ export default function AnonymousChat() {
   }, [messages]);
 
   const handleStartChat = () => {
-    setIsSearching(true);
-    socket.emit('find_anonymous_partner', { userId: anonymousId });
+    if (interests.length === 0) {
+      setShowInterests(true);
+      return;
+    }
     
-    // Auto-match timeout for testing (remove in production)
+    setIsSearching(true);
+    socket.emit('find_anonymous_partner', { 
+      userId: anonymousId,
+      interests: interests 
+    });
+    
+    // Generate random icebreaker
+    const randomIcebreaker = icebreakers[Math.floor(Math.random() * icebreakers.length)];
+    setIcebreaker(randomIcebreaker);
+    
+    // Auto-match timeout for testing
     setTimeout(() => {
       if (isSearching && !isConnected) {
         console.log('Still searching after 5 seconds - check if backend is running');
@@ -91,9 +132,62 @@ export default function AnonymousChat() {
     }, 5000);
   };
 
+  const handleInterestSelect = (interest) => {
+    if (interests.includes(interest)) {
+      setInterests(interests.filter(i => i !== interest));
+    } else if (interests.length < 5) {
+      setInterests([...interests, interest]);
+    } else {
+      toast.error('Maximum 5 interests allowed');
+    }
+  };
+
+  const handleStartWithInterests = () => {
+    if (interests.length === 0) {
+      toast.error('Please select at least one interest');
+      return;
+    }
+    setShowInterests(false);
+    handleStartChat();
+  };
+
+  const handleTyping = (value) => {
+    setMessage(value);
+    
+    if (!isConnected) return;
+    
+    // Send typing indicator
+    socket.emit('anonymous_typing', {
+      roomId,
+      senderId: anonymousId,
+      isTyping: value.length > 0
+    });
+    
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Stop typing after 2 seconds of no input
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.emit('anonymous_typing', {
+        roomId,
+        senderId: anonymousId,
+        isTyping: false
+      });
+    }, 2000);
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!message.trim() || !isConnected) return;
+
+    // Stop typing indicator
+    socket.emit('anonymous_typing', {
+      roomId,
+      senderId: anonymousId,
+      isTyping: false
+    });
 
     socket.emit('send_anonymous_message', {
       roomId,
@@ -110,6 +204,24 @@ export default function AnonymousChat() {
     }]);
 
     setMessage('');
+  };
+
+  const sendIcebreaker = () => {
+    if (!icebreaker || !isConnected) return;
+    
+    socket.emit('send_anonymous_message', {
+      roomId,
+      message: icebreaker,
+      senderId: anonymousId,
+      timestamp: new Date()
+    });
+
+    setMessages(prev => [...prev, {
+      message: icebreaker,
+      senderId: anonymousId,
+      timestamp: new Date(),
+      isOwn: true
+    }]);
   };
 
   const handleDisconnect = () => {
@@ -153,7 +265,41 @@ export default function AnonymousChat() {
 
       {/* Chat Area */}
       <div className="anonymous-chat-area">
-        {!isConnected && !isSearching ? (
+        {showInterests ? (
+          <div className="interests-selector">
+            <div className="interests-content">
+              <h3>Select Your Interests</h3>
+              <p>Choose up to 5 interests to match with like-minded strangers</p>
+              <div className="interests-grid">
+                {availableInterests.map((interest) => (
+                  <button
+                    key={interest}
+                    className={`interest-btn ${interests.includes(interest) ? 'selected' : ''}`}
+                    onClick={() => handleInterestSelect(interest)}
+                  >
+                    {interest}
+                  </button>
+                ))}
+              </div>
+              <div className="interests-actions">
+                <button className="skip-interests-btn" onClick={() => {
+                  setInterests(['🎮 Gaming']); // Default interest
+                  setShowInterests(false);
+                  handleStartChat();
+                }}>
+                  Skip
+                </button>
+                <button 
+                  className="continue-btn" 
+                  onClick={handleStartWithInterests}
+                  disabled={interests.length === 0}
+                >
+                  Continue ({interests.length}/5)
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : !isConnected && !isSearching ? (
           <div className="anonymous-welcome">
             <div className="welcome-content">
               <FiUsers size={64} />
@@ -181,7 +327,18 @@ export default function AnonymousChat() {
         ) : (
           <>
             <div className="anonymous-messages">
-              {messages.length === 0 ? (
+              {/* Icebreaker Suggestion */}
+              {messages.length === 0 && icebreaker && (
+                <div className="icebreaker-suggestion">
+                  <p className="icebreaker-label">💡 Conversation Starter:</p>
+                  <p className="icebreaker-text">"{icebreaker}"</p>
+                  <button className="use-icebreaker-btn" onClick={sendIcebreaker}>
+                    Send This
+                  </button>
+                </div>
+              )}
+              
+              {messages.length === 0 && !icebreaker ? (
                 <div className="no-messages">
                   <p>Say hi to your new stranger friend! 👋</p>
                 </div>
@@ -203,6 +360,19 @@ export default function AnonymousChat() {
                   </div>
                 ))
               )}
+              
+              {/* Typing Indicator */}
+              {partnerTyping && (
+                <div className="typing-indicator-container">
+                  <div className="typing-bubble">
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                  </div>
+                  <span className="typing-text">Stranger is typing...</span>
+                </div>
+              )}
+              
               <div ref={messagesEndRef} />
             </div>
 
@@ -222,7 +392,7 @@ export default function AnonymousChat() {
                 <input
                   type="text"
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => handleTyping(e.target.value)}
                   placeholder="Type your message..."
                   className="message-input"
                 />

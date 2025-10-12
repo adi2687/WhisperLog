@@ -398,10 +398,10 @@ useEffect(() => {
               <FaGoogle />
               <span>Google</span>
             </button>
-            <button className="facebook-btn" onClick={loginWithFacebook}>
+            {/* <button className="facebook-btn" onClick={loginWithFacebook}>
               <FaFacebook />
               <span>Facebook</span>
-            </button>
+            </button> */}
           </div>
 
           <p className="toggle-text">

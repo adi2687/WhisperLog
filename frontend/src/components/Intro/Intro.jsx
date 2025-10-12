@@ -8,7 +8,13 @@ const Intro = ({ onComplete }) => {
   const [fadeState, setFadeState] = useState('in'); // 'in', 'out', or 'between'
   const [complete, setComplete] = useState(false);
   const navigate = useNavigate();
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search)
+    const token=params.get("token")
+    if (!token) return 
+    localStorage.setItem("token",token)
 
+  },[navigate])
   const floatingMessages = [
     { text: "Private. Fast. Real-Time." },
     { text: "Conversations That Disappear" },
