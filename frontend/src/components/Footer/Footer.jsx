@@ -28,17 +28,17 @@ const Footer = () => {
           <a href="/data-deletion">Data Deletion</a>
         </div>
         
-        <div className="footer-social">
+        {/* <div className="footer-social">
           <a href="https://www.facebook.com/aditya.kurani.1" aria-label="Facebook"><FaFacebookF /></a>
           <a href="https://www.instagram.com/aditya_kurani_26/" aria-label="Instagram"><FaInstagram /></a>
           <a href="https://x.com/AdityaKurani" aria-label="Twitter"><FaTwitter /></a>
           <a href="https://www.linkedin.com/in/aditya-kurani-818668176/" aria-label="LinkedIn"><FaLinkedin /></a>
           <a href="https://github.com/adi2687" aria-label="GitHub"><FaGithub /></a>
-        </div>
+        </div> */}
       </div>
       
       <div className="footer-bottom">
-        <p>{new Date().getFullYear()} WhisperLog. All rights reserved. | <a href="https://www.linkedin.com/in/aditya-kurani-818668176/">Aditya Kurani</a></p>
+        <p>{new Date().getFullYear()} WhisperLog. All rights reserved. | <a href="https://www.linkedin.com/in/raghvendra-singh-shaktawat-8a2566279/">Raghvendra Singh Shaktawat</a></p>
       </div>
     </footer>
   );
