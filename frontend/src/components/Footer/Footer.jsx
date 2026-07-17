@@ -38,7 +38,7 @@ const Footer = () => {
       </div>
       
       <div className="footer-bottom">
-        <p>{new Date().getFullYear()} WhisperLog. All rights reserved. | <a href="https://www.linkedin.com/in/raghvendra-singh-shaktawat-8a2566279/">Raghvendra Singh Shaktawat</a></p>
+        <p>{new Date().getFullYear()} WhisperLog. All rights reserved. | <a href="https://www.linkedin.com/in/aditya-shrivastava-6766721ba/">Aditya Shrivastava</a></p>
       </div>
     </footer>
   );
